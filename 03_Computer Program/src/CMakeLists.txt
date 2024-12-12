@@ -19,14 +19,26 @@ set(PROJECT_SOURCES
         main.cpp
         widget.cpp
         widget.h
+        note_interface.h
+        note_interface.cpp
+        note_interface.ui
         widget.ui
-        fs404notes.cpp
+
+        serial.cpp
+
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
     qt_add_executable(FS-404
         MANUAL_FINALIZATION
         ${PROJECT_SOURCES}
+        serial.cpp
+        note_interface.h note_interface.cpp note_interface.ui
+        midi.cpp
+
+
+
+
 
     )
 
@@ -76,3 +88,5 @@ install(TARGETS FS-404
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(FS-404)
 endif()
+
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
