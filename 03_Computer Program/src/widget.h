@@ -47,13 +47,6 @@ private:
 
 };
 
-
-//Translates a 4 integer note value to a 3 integer notemessage
-std::vector<unsigned char> uiToHex(std::vector<int> uiInfo);
-
-// Translates the message to Hex and generates the checksum
-std::vector<unsigned char> notesToHex(std::vector<int> noteInfo);
-
 void delay();
 
 #endif // WIDGET_H

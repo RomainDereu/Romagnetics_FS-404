@@ -54,7 +54,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>4</number>
+    <number>2</number>
    </property>
    <widget class="QWidget" name="note_3notes">
     <widget class="QLabel" name="note_velocity_label">
@@ -213,6 +213,16 @@
      </property>
      <property name="text">
       <string>Midi Channel</string>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_padb_midich_spin">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>10</y>
+       <width>71</width>
+       <height>25</height>
+      </rect>
      </property>
     </widget>
    </widget>
