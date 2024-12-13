@@ -14,6 +14,11 @@ Widget::Widget(QWidget *parent)
     serialDeviceIsConnected = false;
     getAvalilableSerialDevices();
 
+    //setting up the names of the notes
+    ui->note1->update_note_main_label(QString("Note 1"));
+    ui->note2->update_note_main_label(QString("Note 2"));
+    ui->note3->update_note_main_label(QString("Note 3"));
+
 }
 
 

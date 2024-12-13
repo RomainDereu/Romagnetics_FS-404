@@ -1,8 +1,7 @@
 #include "widget.h"
 #include "./ui_widget.h"
-#include <QDebug>
+#include <qdebug>
 #include <QTime>
-
 
 void Widget::fs404notesmessage(){
 
@@ -43,8 +42,6 @@ void Widget::fs404notesmessage(){
                                                       };
 
 
-
-
     if(serialDeviceIsConnected == true)
     {
         //Fetching the info from the UI
@@ -52,10 +49,11 @@ void Widget::fs404notesmessage(){
         std::vector<int> noteInfo2 =  ui->note2->sendNoteInfo();
         std::vector<int> noteInfo3 =  ui->note3->sendNoteInfo();
 
+
         //converting the values
-        std::vector<unsigned char> noteInfo1Hex = notesToHex(noteInfo1);
-        std::vector<unsigned char> noteInfo2Hex = notesToHex(noteInfo2);
-        std::vector<unsigned char> noteInfo3Hex = notesToHex(noteInfo3);
+        std::vector<unsigned char> noteInfo1Hex = uiToHex(noteInfo1);
+        std::vector<unsigned char> noteInfo2Hex = uiToHex(noteInfo2);
+        std::vector<unsigned char> noteInfo3Hex = uiToHex(noteInfo3);
 
 
         /* Message format:
@@ -119,7 +117,45 @@ void Widget::fs404notesmessage(){
 }
 
 
+//Translates a 4 integer note value to a 3 integer notemessage
+std::vector<unsigned char> uiToHex(std::vector<int> uiInfo){
+    // 0 for "SP Midi A", 1 for "SP Midi B", 2 for "SP Commands", 3 for "Midi Notes", "CC"
+    int whichMode = uiInfo[0];
+    //deleting the first element of the vector
+    uiInfo.erase(uiInfo.begin());
 
+    // 0 for "SP Midi A"
+    if(whichMode == 0){
+        std::vector<unsigned char> tbd(3);
+        return tbd;
+    }
+
+    // 1 for "SP Midi B"
+    else if(whichMode == 1){
+        std::vector<unsigned char> tbd(3);
+        return tbd;
+    }
+
+    // 2 for SP Commands
+    else if(whichMode == 2){
+        std::vector<unsigned char> tbd(3);
+        return tbd;
+    }
+
+   //3 for notes
+    else if(whichMode == 3){
+        std::vector<unsigned char> noteInfo = notesToHex(uiInfo);
+        return noteInfo;
+    }
+
+
+    //Romain continue with other values
+    else{
+        std::vector<unsigned char> error(3);
+        return error;
+    }
+
+}
 
 
  //Romain change to pointer
@@ -127,7 +163,8 @@ void Widget::fs404notesmessage(){
  std::vector<unsigned char> notesToHex(std::vector<int> noteInfo){
      std::vector<unsigned char> returnValue;
      //The first value is the midi channel
-     std::vector<unsigned char> list_midi_channels_hex = {0x90, 0x91, 0x92, 0x93,
+     std::vector<unsigned char> list_midi_channels_hex = {0,
+                                                          0x90, 0x91, 0x92, 0x93,
                                                           0x94, 0x95, 0x96, 0x97,
                                                           0x98, 0x99, 0x9A, 0x9B,
                                                           0x9C, 0x9D, 0x9E, 0x9F };
@@ -147,8 +184,8 @@ void Widget::fs404notesmessage(){
                                                   0x6C, 0x6D, 0x6E, 0x6F, 0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77,
                                                   0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F };
      returnValue.push_back(list_notes_hex[noteInfo[1]]);
-     //The third value is the velocity
-     returnValue.push_back(noteInfo[2]);
+     //The third value is the velocity. minus 1 since the values are shifted
+     returnValue.push_back(noteInfo[2] - 1);
 
      return returnValue;
  };

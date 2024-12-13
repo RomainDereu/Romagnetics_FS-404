@@ -28,6 +28,7 @@ bool Widget::serialRead()
     {
         QByteArray serialMessage = usbDevice->read(1);
         unsigned char* serialMessageByte = new unsigned char[1];
+        //Romain delete
         std::memcpy(serialMessageByte,serialMessage.constData(),1);;
         qDebug() << serialMessageByte;
         if (*serialMessageByte == 0xfd){

@@ -13,23 +13,23 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <widget class="QComboBox" name="note_type">
+  <widget class="QComboBox" name="note_list_mode_combo">
    <property name="geometry">
     <rect>
      <x>70</x>
      <y>10</y>
      <width>131</width>
-     <height>24</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>
-  <widget class="QLabel" name="note1_main_label">
+  <widget class="QLabel" name="note_main_label">
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>10</y>
+     <y>4</y>
      <width>41</width>
-     <height>25</height>
+     <height>41</height>
     </rect>
    </property>
    <property name="font">
@@ -44,115 +44,236 @@
     <set>Qt::AlignmentFlag::AlignCenter</set>
    </property>
   </widget>
-  <widget class="QStackedWidget" name="note1_stackedWidget">
+  <widget class="QStackedWidget" name="note_stackedWidget">
    <property name="geometry">
     <rect>
      <x>210</x>
      <y>0</y>
-     <width>541</width>
+     <width>721</width>
      <height>41</height>
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>4</number>
    </property>
-   <widget class="QWidget" name="note1_notes">
-    <widget class="QWidget" name="noteselection1" native="true">
+   <widget class="QWidget" name="note_3notes">
+    <widget class="QLabel" name="note_velocity_label">
      <property name="geometry">
       <rect>
-       <x>-30</x>
+       <x>330</x>
+       <y>10</y>
+       <width>41</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Velocity</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_midich_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>10</y>
+       <width>71</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Midi Channel</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_note_label">
+     <property name="geometry">
+      <rect>
+       <x>190</x>
+       <y>10</y>
+       <width>26</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Note</string>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_velocity_spin">
+     <property name="geometry">
+      <rect>
+       <x>400</x>
+       <y>10</y>
+       <width>45</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>128</number>
+     </property>
+     <property name="value">
+      <number>128</number>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="note_note_combo">
+     <property name="geometry">
+      <rect>
+       <x>230</x>
+       <y>10</y>
+       <width>72</width>
+       <height>24</height>
+      </rect>
+     </property>
+     <property name="currentText">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_midich_spin">
+     <property name="geometry">
+      <rect>
+       <x>110</x>
+       <y>10</y>
+       <width>42</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>16</number>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="note_4cc"/>
+   <widget class="QWidget" name="note_1padb">
+    <widget class="QSpinBox" name="note_padb_velocity_spin">
+     <property name="geometry">
+      <rect>
+       <x>480</x>
+       <y>10</y>
+       <width>42</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>128</number>
+     </property>
+     <property name="value">
+      <number>128</number>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_padb_velocity_label">
+     <property name="geometry">
+      <rect>
+       <x>410</x>
        <y>0</y>
-       <width>761</width>
+       <width>71</width>
        <height>51</height>
       </rect>
      </property>
-     <widget class="QComboBox" name="note_midich_combo">
-      <property name="geometry">
-       <rect>
-        <x>130</x>
-        <y>10</y>
-        <width>72</width>
-        <height>24</height>
-       </rect>
-      </property>
-     </widget>
-     <widget class="QLabel" name="note_velocity_label">
-      <property name="geometry">
-       <rect>
-        <x>360</x>
-        <y>10</y>
-        <width>41</width>
-        <height>25</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Velocity</string>
-      </property>
-     </widget>
-     <widget class="QComboBox" name="note_note_combo">
-      <property name="geometry">
-       <rect>
-        <x>260</x>
-        <y>10</y>
-        <width>72</width>
-        <height>24</height>
-       </rect>
-      </property>
-      <property name="currentText">
-       <string/>
-      </property>
-     </widget>
-     <widget class="QSpinBox" name="note_velocity_spin">
-      <property name="geometry">
-       <rect>
-        <x>430</x>
-        <y>10</y>
-        <width>45</width>
-        <height>25</height>
-       </rect>
-      </property>
-      <property name="minimum">
-       <number>1</number>
-      </property>
-      <property name="maximum">
-       <number>128</number>
-      </property>
-     </widget>
-     <widget class="QLabel" name="note_note_label">
-      <property name="geometry">
-       <rect>
-        <x>220</x>
-        <y>10</y>
-        <width>26</width>
-        <height>25</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Note</string>
-      </property>
-     </widget>
-     <widget class="QLabel" name="note_midich_label">
-      <property name="geometry">
-       <rect>
-        <x>40</x>
-        <y>10</y>
-        <width>71</width>
-        <height>25</height>
-       </rect>
-      </property>
-      <property name="text">
-       <string>Midi Channel</string>
-      </property>
-     </widget>
-     <zorder>note_midich_combo</zorder>
-     <zorder>note_velocity_label</zorder>
-     <zorder>note_note_combo</zorder>
-     <zorder>note_note_label</zorder>
-     <zorder>note_velocity_spin</zorder>
-     <zorder>note_midich_label</zorder>
+     <property name="text">
+      <string>Velocity</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_padb_value_label">
+     <property name="geometry">
+      <rect>
+       <x>200</x>
+       <y>5</y>
+       <width>71</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Pad Value</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="note_padb_value_combo">
+     <property name="geometry">
+      <rect>
+       <x>290</x>
+       <y>15</y>
+       <width>101</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_padb_midich_label">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>81</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Midi Channel</string>
+     </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="note1_padsa"/>
+   <widget class="QWidget" name="note_2commands"/>
+   <widget class="QWidget" name="note_0padsa">
+    <widget class="QLabel" name="note_pada_value_label">
+     <property name="geometry">
+      <rect>
+       <x>10</x>
+       <y>0</y>
+       <width>71</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Pad Value</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="note_pada_value_combo">
+     <property name="geometry">
+      <rect>
+       <x>100</x>
+       <y>10</y>
+       <width>101</width>
+       <height>24</height>
+      </rect>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_pada_velocity_label">
+     <property name="geometry">
+      <rect>
+       <x>220</x>
+       <y>-5</y>
+       <width>71</width>
+       <height>51</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Velocity</string>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_pada_velocity_spin">
+     <property name="geometry">
+      <rect>
+       <x>290</x>
+       <y>10</y>
+       <width>42</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>128</number>
+     </property>
+     <property name="value">
+      <number>128</number>
+     </property>
+    </widget>
+   </widget>
   </widget>
  </widget>
  <resources/>
