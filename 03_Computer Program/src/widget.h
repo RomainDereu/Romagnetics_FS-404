@@ -25,6 +25,8 @@ private slots:
     void on_connect_button_clicked();
     void on_disconnect_button_clicked();
 
+    void on_refresh_button_clicked();
+
 private:
     void getAvalilableSerialDevices();
     bool serialRead();

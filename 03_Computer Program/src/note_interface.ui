@@ -212,16 +212,16 @@
       </rect>
      </property>
      <property name="text">
-      <string>Midi Channel</string>
+      <string>Midi Channels</string>
      </property>
     </widget>
-    <widget class="QSpinBox" name="note_padb_midich_spin">
+    <widget class="QComboBox" name="note_padb_midich_combo">
      <property name="geometry">
       <rect>
-       <x>90</x>
+       <x>100</x>
        <y>10</y>
-       <width>71</width>
-       <height>25</height>
+       <width>72</width>
+       <height>24</height>
       </rect>
      </property>
     </widget>

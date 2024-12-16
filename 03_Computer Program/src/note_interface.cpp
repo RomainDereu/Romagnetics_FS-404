@@ -10,6 +10,13 @@ Note_interface::Note_interface(QWidget *parent)
 {
     note_ui->setupUi(this);
 
+    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC" };
+
+    //Populating the upload modes
+    for (int x = 0; x < list_modes.size(); x++){
+        note_ui->note_list_mode_combo->addItem(QString::fromStdString(list_modes[x]));
+    }
+
     //Defining the values for the Comboboxes and their respective hex values
     //All the values are declared explicitely for better readability
     const std::vector<std::string> list_notes = {
@@ -26,6 +33,11 @@ Note_interface::Note_interface(QWidget *parent)
         "C10", "C#10", "D10", "D#10", "E10", "F10", "F#10", "G10"
     };
 
+    //Populating Midi Notes Mode 3
+    for (int x = 0; x < list_notes.size(); x++){
+        note_ui->note_note_combo->addItem(QString::fromStdString(list_notes[x]));
+    }
+
     const std::vector<std::string> list_pads = {
         "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16",
         "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10", "B11", "B12", "B13", "B14", "B15", "B16",
@@ -39,96 +51,24 @@ Note_interface::Note_interface(QWidget *parent)
         "J1", "J2", "J3", "J4", "J5", "J6", "J7", "J8", "J9", "J10", "J11", "J12", "J13", "J14", "J15", "J16",
     };
 
-    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC" };
-
-    //Populating the upload modes
-    for (int x = 0; x < list_modes.size(); x++){
-        note_ui->note_list_mode_combo->addItem(QString::fromStdString(list_modes[x]));
-    }
-
-
-    //Populating the SP Midi A mode
-    //Pads
+    //Populating the SP Midi A pads
     for (int x = 0; x < list_pads.size(); x++){
         note_ui->note_pada_value_combo->addItem(QString::fromStdString(list_pads[x]));
     }
 
-    //Populating Midi Notes Mode
-    for (int x = 0; x < list_notes.size(); x++){
-        note_ui->note_note_combo->addItem(QString::fromStdString(list_notes[x]));
+    //Populating the SP Midi B pads
+    for (int x = 0; x < list_pads.size(); x++){
+        note_ui->note_padb_value_combo->addItem(QString::fromStdString(list_pads[x]));
+    }
+
+    const std::vector<std::string> list_midi_b = { "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10", "10/11"};
+
+    //Populating mode B midi channels
+    for (int x = 0; x < list_midi_b.size(); x++){
+        note_ui->note_padb_midich_combo->addItem(QString::fromStdString(list_midi_b[x]));
     }
 
 }
-
-std::array<unsigned char, 3>  Note_interface::sendNoteInfo()
-{
-    //Checking which UI is active
-    // 0 for "SP Midi A", 1 for "SP Midi B", 2 for "SP Commands", 3 for "Midi Notes", "CC"
-    QString activeUiCode = note_ui->note_list_mode_combo->currentText();
-    std::array<unsigned char, 3> NoteInfo;
-
-    if (activeUiCode == "SP Midi A") {
-        //getting the raw values
-        QString note_pada_value_combo_string = note_ui->note_pada_value_combo->currentText();
-        int note_pada_value_combo_index = note_ui->note_pada_value_combo->currentIndex();
-        //From letter to channel and from index to note
-        QChar note_pada_value_combo_first_char = note_pada_value_combo_string.at(0);
-
-        //Final values to be uploaded
-        unsigned char note_pada_midi_channel = letterToMidiChannel(note_pada_value_combo_first_char);
-        unsigned char note_pada_note = indexToPadANote(note_pada_value_combo_index);
-        unsigned char velocity_spin_value = note_ui->note_pada_velocity_spin->value();
-
-
-        //Translating to hex value
-        NoteInfo[0] = note_pada_midi_channel;
-        NoteInfo[1] = note_pada_note;
-        NoteInfo[2] = velocity_spin_value -1;
-    }
-
-    else if (activeUiCode == "SP Midi B") {
-        //Translating to hex value
-        NoteInfo[0] = 0x01;
-        NoteInfo[1] = 0x01;
-        NoteInfo[2] = 0x01;
-    }
-
-    else if (activeUiCode == "SP Commands") {
-        //Translating to hex value
-        NoteInfo[0] = 0x01;
-        NoteInfo[1] = 0x01;
-        NoteInfo[2] = 0x01;
-    }
-
-    else if  (activeUiCode == "Midi Notes") {
-    //getting the raw values
-    int note_midi_ch = note_ui->note_midich_spin->value();
-    int note_note_combo = note_ui->note_note_combo->currentIndex();
-    unsigned char velocity_spin_value = note_ui->note_velocity_spin->value() ;
-    //Translating to hex value
-    NoteInfo[0] = midichannel_to_hex(note_midi_ch);
-    NoteInfo[1] = musical_note_to_hex(note_note_combo);
-    NoteInfo[2] = velocity_spin_value -1;
-    }
-
-    else if (activeUiCode == "CC") {
-        //Translating to hex value
-        NoteInfo[0] = 0x01;
-        NoteInfo[1] = 0x01;
-        NoteInfo[2] = 0x01;
-    }
-
-    //Romain the length of NoteInfo and the values need to be checked
-    return NoteInfo;
-}
-
-//updating the note labe:
-void Note_interface::update_note_main_label(QString label_text)
-{
-    note_ui->note_main_label->setText(label_text);
-    return;
-}
-
 
 //Updating the page shown by QStackedWidget
 void Note_interface::on_note_list_mode_combo_currentTextChanged(const QString &arg1)
@@ -171,9 +111,91 @@ void Note_interface::on_note_list_mode_combo_currentTextChanged(const QString &a
 
 }
 
+//Main interface between the UI and the notes being send
+std::array<unsigned char, 3>  Note_interface::sendNoteInfo()
+{
+    //Checking which UI is active
+    // 0 for "SP Midi A", 1 for "SP Midi B", 2 for "SP Commands", 3 for "Midi Notes", "CC"
+    QString activeUiCode = note_ui->note_list_mode_combo->currentText();
+    std::array<unsigned char, 3> NoteInfo;
+
+    if (activeUiCode == "SP Midi A") {
+        //getting the raw values
+        QString note_pada_value_combo_string = note_ui->note_pada_value_combo->currentText();
+        int note_pada_value_combo_index = note_ui->note_pada_value_combo->currentIndex();
+        //From letter to channel and from index to note
+        QChar note_pada_value_combo_first_char = note_pada_value_combo_string.at(0);
+
+        //Final values to be uploaded
+        unsigned char note_pada_midi_channel = letterToMidiChannela(note_pada_value_combo_first_char);
+        unsigned char note_pada_note = indexToPadANote(note_pada_value_combo_index);
+        unsigned char velocity_spin_value = note_ui->note_pada_velocity_spin->value();
+
+
+        //Translating to hex value
+        NoteInfo[0] = note_pada_midi_channel;
+        NoteInfo[1] = note_pada_note;
+        NoteInfo[2] = velocity_spin_value -1;
+    }
+
+    else if (activeUiCode == "SP Midi B") {
+        //Getting the raw values
+        int note_padb_value_combo_string = note_ui->note_padb_midich_combo->currentIndex();
+        int note_padb_value_combo = note_ui->note_padb_value_combo->currentIndex();
+        unsigned char note_padb_velocity_spin = note_ui->note_padb_velocity_spin->value();
+
+        //Midi channel and note are calculated together since both informaion is needed
+        std::array<unsigned char, 2 >midiChannelAndPadMidiB = numberToMidiChannelb(note_padb_value_combo_string, note_padb_value_combo);
+
+
+        //getting the raw values
+        NoteInfo[0] = midiChannelAndPadMidiB[0];
+        NoteInfo[1] = midiChannelAndPadMidiB[1];
+        NoteInfo[2] = note_padb_velocity_spin-1;
+    }
+
+    else if (activeUiCode == "SP Commands") {
+        //Translating to hex value
+        NoteInfo[0] = 0x01;
+        NoteInfo[1] = 0x01;
+        NoteInfo[2] = 0x01;
+    }
+
+    else if  (activeUiCode == "Midi Notes") {
+    //getting the raw values
+    int note_midi_ch = note_ui->note_midich_spin->value();
+    int note_note_combo = note_ui->note_note_combo->currentIndex();
+    unsigned char velocity_spin_value = note_ui->note_velocity_spin->value() ;
+    //Translating to hex value
+    NoteInfo[0] = midichannel_to_hex(note_midi_ch);
+    NoteInfo[1] = musical_note_to_hex(note_note_combo);
+    NoteInfo[2] = velocity_spin_value -1;
+    }
+
+    else if (activeUiCode == "CC") {
+        //Translating to hex value
+        NoteInfo[0] = 0x01;
+        NoteInfo[1] = 0x01;
+        NoteInfo[2] = 0x01;
+    }
+
+    //Romain the length of NoteInfo and the values need to be checked
+    return NoteInfo;
+}
+
+//updating the note labe:
+void Note_interface::update_note_main_label(QString label_text)
+{
+    note_ui->note_main_label->setText(label_text);
+    return;
+}
+
+
+
+
 //Functions used by Midi mode A
 //Letter to midi channel
-unsigned char Note_interface::letterToMidiChannel(QChar firstLetter){
+unsigned char Note_interface::letterToMidiChannela(QChar firstLetter){
     std::vector<char> pad_letters = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'};
     int midi_channel = 1;
     for(int x=0; x<pad_letters.size(); x++){
@@ -183,6 +205,62 @@ unsigned char Note_interface::letterToMidiChannel(QChar firstLetter){
     }
     unsigned char hexmidichannel = midichannel_to_hex(midi_channel);
     return hexmidichannel;
+}
+
+
+//Transforms the string from Midi channel B to the correct midi channel it should be send to
+std::array <unsigned char, 2>Note_interface::numberToMidiChannelb(int channels_index, int note_padb_value_combo){
+    //Defining if the note is in the upper or the lower register of the midi channels
+    bool lowerOrHigher;
+    if (note_padb_value_combo > 79){lowerOrHigher = 1;}
+    else {lowerOrHigher = 0;}
+
+    std::vector<unsigned char> list_midi_channels_hex = {0,
+                                                         0x90, 0x91, 0x92, 0x93,
+                                                         0x94, 0x95, 0x96, 0x97,
+                                                         0x98, 0x99, 0x9A, 0x9B};
+
+  //Creating the midi channel message
+  unsigned char midi_channel_message = list_midi_channels_hex[(channels_index*2)+1+lowerOrHigher];
+
+    //note_padb_value_combo has a value from 0 to 160
+    //Substracting 80 if the value exceeds 80 to get the correct note
+    int note_padb_value_80 = note_padb_value_combo;
+    if (note_padb_value_80 > 79 ){note_padb_value_80 = note_padb_value_80 - 80;}
+
+    //This mode uses two MIDI channels: 1 and 2, each encompassing 5 banks in the SP
+    std::array<unsigned char, 80> list_pads_modeb_hex = {//Banks A and F
+                                                      0x18, 0x19, 0x2a, 0x2b,
+                                                      0x14, 0x15, 0x16, 0x17,
+                                                      0x10, 0x11, 0x12, 0x13,
+                                                      0x0c, 0x0d, 0x0e, 0x0f,
+                                                      //Banks B and G
+                                                      0x28, 0x29, 0x3a, 0x3b,
+                                                      0x24, 0x25, 0x26, 0x27,
+                                                      0x20, 0x21, 0x22, 0x23,
+                                                      0x1c, 0x1d, 0x1e, 0x1f,
+                                                      //Banks C and H
+                                                      0x38, 0x39, 0x4a, 0x4b,
+                                                      0x34, 0x35, 0x36, 0x37,
+                                                      0x30, 0x31, 0x32, 0x33,
+                                                      0x2c, 0x2d, 0x2e, 0x2f,
+                                                      //Banks D and I
+                                                      0x48, 0x49, 0x5a, 0x5b,
+                                                      0x44, 0x45, 0x46, 0x47,
+                                                      0x40, 0x41, 0x42, 0x43,
+                                                      0x3c, 0x3d, 0x3e, 0x3f,
+                                                      //Banks E and J
+                                                      0x58, 0x59, 0x6a, 0x6b,
+                                                      0x54, 0x55, 0x56, 0x57,
+                                                      0x50, 0x51, 0x52, 0x53,
+                                                      0x4c, 0x4d, 0x4e, 0x4f,
+                                                      };
+
+    unsigned char note_midi_message = list_pads_modeb_hex[note_padb_value_80];
+
+    //Returning the possible midi channels based on the QString Channels
+    std::array <unsigned char, 2> returnvalue = {midi_channel_message, note_midi_message};
+    return returnvalue;
 }
 
 //Index to pad note
@@ -199,10 +277,7 @@ unsigned char Note_interface::indexToPadANote(int comboIndex){
                                                       0x2c, 0x2d, 0x2e, 0x2f,
                                                       0x28, 0x29, 0x2a, 0x2b,
                                                       0x24, 0x25, 0x26, 0x27};
-
-    qDebug() << list_pads_modea_hex[noteIndex];
     return list_pads_modea_hex[noteIndex];
-
 }
 
 

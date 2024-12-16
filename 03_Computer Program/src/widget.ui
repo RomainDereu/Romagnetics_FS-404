@@ -95,20 +95,20 @@
   <widget class="QWidget" name="layoutWidget">
    <property name="geometry">
     <rect>
-     <x>20</x>
+     <x>10</x>
      <y>50</y>
-     <width>702</width>
+     <width>781</width>
      <height>26</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout_2">
     <property name="spacing">
-     <number>50</number>
+     <number>5</number>
     </property>
     <item>
      <widget class="QLabel" name="arduino_available_devices">
       <property name="text">
-       <string>Available devices</string>
+       <string>        Available devices</string>
       </property>
      </widget>
     </item>
@@ -116,9 +116,16 @@
      <widget class="QComboBox" name="serialPortSelect_comboBox">
       <property name="minimumSize">
        <size>
-        <width>300</width>
+        <width>200</width>
         <height>0</height>
        </size>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="refresh_button">
+      <property name="text">
+       <string>Refresh Devices</string>
       </property>
      </widget>
     </item>

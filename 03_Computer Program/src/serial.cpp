@@ -28,19 +28,20 @@ bool Widget::serialRead()
     {
         QByteArray serialMessage = usbDevice->read(1);
         unsigned char* serialMessageByte = new unsigned char[1];
-        //Romain delete
         std::memcpy(serialMessageByte,serialMessage.constData(),1);;
-        qDebug() << serialMessageByte;
         if (*serialMessageByte == 0xfd){
             ui->logPlainTextEdit->appendPlainText("Transfer successful");
+            delete[] serialMessageByte;
             return 1;
             }
         else{
             ui->logPlainTextEdit->appendPlainText("Transfer failed");
+            delete[] serialMessageByte;
             return 0;
             }
         }
-    else{return 0;}
+    else{
+            return 0;}
     }
 
 
@@ -55,13 +56,22 @@ void Widget::on_connect_button_clicked()
 {
     if(serialDeviceIsConnected == false)
     {
-        usbDevice->setPortName(serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].portName());
-        deviceDescription = serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].description();
-        ui->logPlainTextEdit->appendPlainText("connecting to: " + usbDevice->portName());
+        //No connexion can be set if no ports are available
+        if(QSerialPortInfo::availablePorts().isEmpty()){
+            serialDeviceIsConnected = false;
+            }
+
+        else{
+            usbDevice->setPortName(serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].portName());
+            deviceDescription = serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].description();
+            ui->logPlainTextEdit->appendPlainText("connecting to: " + usbDevice->portName());
+        }
         if(usbDevice->open(QIODevice::ReadWrite))
         {
             //Now the serial port is open try to set configuration
-            if(!usbDevice->setBaudRate(baudrate))        //Depends on your boud-rate on the Device
+            //Depends on your boud-rate on the Device
+            //Romain remplacer tous les qDebug avant deploy
+            if(!usbDevice->setBaudRate(baudrate))
                 qDebug()<<usbDevice->errorString();
 
             if(!usbDevice->setDataBits(QSerialPort::Data8))
@@ -90,7 +100,7 @@ void Widget::on_connect_button_clicked()
     }
     else
     {
-        ui->logPlainTextEdit->appendPlainText("Can't connect, another device is connected");
+        ui->logPlainTextEdit->appendPlainText("Can't connect, please check the USB device");
     }
 }
 

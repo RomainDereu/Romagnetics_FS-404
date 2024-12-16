@@ -29,8 +29,10 @@ private slots:
 private:
     Ui::Note_interface *note_ui;
     //Used for midiA
-    //First letter to Midi Channel
-    unsigned char letterToMidiChannel(QChar firstLetter);
+    //First letter to Midi Channel A
+    unsigned char letterToMidiChannela(QChar firstLetter);
+    //Number to midi channel B
+    std::array<unsigned char, 2>numberToMidiChannelb(int channels_index, int note_padb_value_combo);
     //index to pad note
     unsigned char indexToPadANote(int comboIndex);
     //Used for the notes

@@ -21,9 +21,14 @@ Widget::Widget(QWidget *parent)
 
 }
 
+void Widget::on_refresh_button_clicked(){getAvalilableSerialDevices();}
+
+
 
 Widget::~Widget()
 {
     delete ui;
     delete usbDevice;
 }
+
+
