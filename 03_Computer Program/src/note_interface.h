@@ -1,6 +1,6 @@
 #ifndef NOTE_INTERFACE_H
 #define NOTE_INTERFACE_H
-
+#include "midi_note.h"
 #include <QWidget>
 
 namespace Ui {
@@ -18,7 +18,7 @@ public:
     // Link between the UI and the other MIDI functions
     // Takes the UI values and transforms them.
     // The other functions are defined below.
-    std::array<unsigned char, 3> sendNoteInfo();
+    Midi_note sendNoteInfo();
 
     //updating the note labe:
     void update_note_main_label(QString label_text);
@@ -27,20 +27,9 @@ private slots:
     void on_note_list_mode_combo_currentTextChanged(const QString &arg1);
 
 private:
+    //Setting up note interface
     Ui::Note_interface *note_ui;
-    //Used for midiA
-    //First letter to Midi Channel A
-    unsigned char letterToMidiChannela(QChar firstLetter);
-    //Number to midi channel B
-    std::array<unsigned char, 2>numberToMidiChannelb(int channels_index, int note_padb_value_combo);
-    //index to pad note
-    unsigned char indexToPadANote(int comboIndex);
-    //Used for the notes
-    //Returns the midi byte when provided with the midi channel
-    unsigned char midichannel_to_hex(int midi_channel);
-    //Returns the midi byte when provided with the midi channel
-    unsigned char musical_note_to_hex(int musical_note_position);
-
+    void setup_noteui();
 
 };
 

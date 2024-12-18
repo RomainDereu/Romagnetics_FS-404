@@ -145,7 +145,95 @@
      </property>
     </widget>
    </widget>
-   <widget class="QWidget" name="note_4cc"/>
+   <widget class="QWidget" name="note_4cc">
+    <widget class="QLabel" name="note_cc_number_label">
+     <property name="geometry">
+      <rect>
+       <x>170</x>
+       <y>10</y>
+       <width>81</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>CC Number</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_cc_value_label">
+     <property name="geometry">
+      <rect>
+       <x>330</x>
+       <y>10</y>
+       <width>111</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>CC Value</string>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_cc_number_spin">
+     <property name="geometry">
+      <rect>
+       <x>250</x>
+       <y>10</y>
+       <width>71</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>128</number>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_cc_value_spin">
+     <property name="geometry">
+      <rect>
+       <x>390</x>
+       <y>10</y>
+       <width>71</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>128</number>
+     </property>
+    </widget>
+    <widget class="QLabel" name="note_cc_midi_label">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>10</y>
+       <width>91</width>
+       <height>16</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>Midi Channel</string>
+     </property>
+    </widget>
+    <widget class="QSpinBox" name="note_cc_midi_spin">
+     <property name="geometry">
+      <rect>
+       <x>90</x>
+       <y>10</y>
+       <width>71</width>
+       <height>25</height>
+      </rect>
+     </property>
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>16</number>
+     </property>
+    </widget>
+   </widget>
    <widget class="QWidget" name="note_1padb">
     <widget class="QSpinBox" name="note_padb_velocity_spin">
      <property name="geometry">

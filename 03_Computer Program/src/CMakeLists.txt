@@ -23,7 +23,6 @@ set(PROJECT_SOURCES
         note_interface.cpp
         note_interface.ui
         widget.ui
-
         serial.cpp
 
 )
@@ -34,7 +33,8 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         serial.cpp
         note_interface.h note_interface.cpp note_interface.ui
-        midi.cpp
+
+        midi_note.h midi_note.cpp
 
 
 
