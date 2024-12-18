@@ -18,7 +18,8 @@ const int led2 = 9;
 const int led3 = 8;
 const int ledon = 7;
 // Switch leds are the three that change according to the switch
-const int switchLedNumbers[] = {led1, led2, led3};
+//Romain delete for production
+const int switchLedNumbers[] = { led1, led2, led3 };
 
 // The notes that will be played. Read from Eeprom
 const int cmd1 = EEPROM.read(1);
@@ -35,106 +36,185 @@ const int velocity3 = EEPROM.read(9);
 
 
 void setup() {
-  //Leave the following part of the code uncommented if you want to reset the FS-404 to default values
-  
-  
+
   /*
-  //0x90 is for midi 1
-  //Plays pads 1 to 3
-  //The notes are played at 64 velocity
-  int defaultNotes[] = {0, 0x90, 0x0C, 64, 0x90 , 0x0D, 64, 0x90 , 0x0E ,64};
+  //Leave the following part of the code uncommented if you want to reset the FS-404 to its default values
+  //Plays pads 1 to 3 in midi mode B & midi channels 1 & 2
+  int defaultNotes[] = {0x00, 0x90, 0x18, 0x80, 0x90 , 0x19, 0x80, 0x90 , 0x1a ,0x7F};
 
   //Writing to the Eeprom
-  for(int i=1; i<=sizeof(defaultNotes); i++){
+  for(int i=1; i<11; i++){
     EEPROM.write(i, defaultNotes[i]);
    }
-  
-   
-  //9600 baud for debugging
-  Serial.begin(9600);
-  for(int i=1; i<=9; i++){
-    Serial.println(EEPROM.read(i));
-   }
-  Serial.end();
   */
 
 
 
-  
-
   Serial.begin(31250);
 
-  //setting of switch  and ON OFF pins
+  // Setting of switch  and ON OFF pins
   pinMode(leftSwitchPin, INPUT_PULLUP);
   pinMode(rightSwitchPin, INPUT_PULLUP);
-  pinMode(onOffSwitchPin, INPUT_PULLUP);  
-  //setting of led pins
-  for(int i = led1; i<=ledon; i++)
-  {   
-   pinMode(i, OUTPUT);
-  }
+  pinMode(onOffSwitchPin, INPUT_PULLUP);
+  // Setting of led pins
+  pinMode(ledon, OUTPUT);
+
+  //Romain delete production
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(led3, OUTPUT);
 
   // The power led is always on
   digitalWrite(ledon, HIGH);
 }
 
 int switchposition() {
-    //Reading the state of both the switch and the on off button
-    int leftSwitchRead = digitalRead(leftSwitchPin);
-    int rightSwitchRead = digitalRead(rightSwitchPin);
-    if (leftSwitchRead == HIGH && rightSwitchRead == LOW) {return 0;}
-    else if (leftSwitchRead == HIGH && rightSwitchRead == HIGH) {return 1;}
-    else if (leftSwitchRead == LOW && rightSwitchRead == HIGH) {return 2;}
-    else{return;}
+  // Reading the state of both the switch and the on off button
+  int leftSwitchRead = digitalRead(leftSwitchPin);
+  int rightSwitchRead = digitalRead(rightSwitchPin);
+  if (leftSwitchRead == HIGH && rightSwitchRead == LOW) {
+    return 0;
+  } else if (leftSwitchRead == HIGH && rightSwitchRead == HIGH) {
+    return 1;
+  } else if (leftSwitchRead == LOW && rightSwitchRead == HIGH) {
+    return 2;
+  } else {
+    return;
   }
+}
 
 //Romain delete for production
 void updatelight(int toggleSwitchPosition) {
-  for(int i=0; i<=2; i++){    
-    if (i == toggleSwitchPosition) {digitalWrite(switchLedNumbers[i], HIGH); }
-    else {digitalWrite(switchLedNumbers[i], LOW);}
+  for (int i = 0; i < 3; i++) {
+    if (i == toggleSwitchPosition) {
+      digitalWrite(switchLedNumbers[i], HIGH);
+    } else {
+      digitalWrite(switchLedNumbers[i], LOW);
     }
-  return;
   }
+  return;
+}
 
-// plays a MIDI note. Doesn't check to see that cmd is greater than 127, or that
-// data values are less than 127:
+// Plays a MIDI note once
 void noteOn(int cmd, int pitch, int velocity) {
   Serial.write(cmd);
   Serial.write(pitch);
   Serial.write(velocity);
   return;
-  }
+}
 
-void sendmidi(int toggleSwitchPosition) {
-  if (toggleSwitchPosition == 0){noteOn(cmd1, pitch1, velocity1);}
-  else if (toggleSwitchPosition == 1){noteOn(cmd2, pitch2, velocity2);}
-  else if (toggleSwitchPosition == 2){noteOn(cmd3, pitch3, velocity3);}
+
+// Checks the type of the note
+// Sends note off if the message is a note
+void noteOff(int cmd, int pitch, int velocity) {
+
+  if(cmd > 0x8a && cmd < 0xA0){
+    int noteOffCmd = cmd - 0x10;
+    Serial.write(noteOffCmd);
+    Serial.write(pitch);
+    Serial.write(velocity);
+  }
   return;
-  }
+}
 
-bool debounce (bool previousButtonSwitch) {
-  if(previousButtonSwitch == LOW){
+// Plays a MIDI note and then sends a corresponding note off 100ms later
+void sendnote(int cmd, int pitch, int velocity) {
+  noteOn(cmd, pitch, velocity);
+  delay(100);
+  noteOff(cmd, pitch, velocity);
+  return;
+}
+
+// Choosing which note will be played
+void sendmidi(int toggleSwitchPosition) {
+  if (toggleSwitchPosition == 0) {
+    sendnote(cmd1, pitch1, velocity1);
+  } else if (toggleSwitchPosition == 1) {
+    sendnote(cmd2, pitch2, velocity2);
+  } else if (toggleSwitchPosition == 2) {
+    sendnote(cmd3, pitch3, velocity3);
+  }
+  return;
+}
+
+//Limits the button presses to non consecutive button presses
+bool debounce(bool previousButtonSwitch) {
+  if (previousButtonSwitch == LOW) {
     return 0;
-    }
+  }
 
-  else
-  {
-    delay(10);
+  else {
+    delay(5);
     bool currentState = digitalRead(onOffSwitchPin);
-    if(currentState == LOW){return 1;}
-    else{return 0;}
+    if (currentState == LOW) {
+      return 1;
+    } else {
+      return 0;
     }
   }
+}
+
+//Updates the notes to the Unit
+void notesupdate() {
+  /* Message format:
+    Header       (1 byte)           - Header Byte (value 0xfe)
+    Data         (9 bytes)          - Info for the three notes
+    Checksum     (1 byte)           - Message integrity check
+    Message end  (1 byte)           - Signaling the end of the message (value 0xff)
+    Total message size = 12 bythes
+*/
+
+  byte buffer[12];
+  Serial.readBytesUntil(0xff, buffer, 12);
+  delay(100);
+  //Checksum of the message
+  bool checksumResult = messagecheck(buffer);
+
+  if (checksumResult == 1) {
+    //Writing to the Eeprom
+    for (int i = 1; i < 11; i++) { EEPROM.write(i, buffer[i]); }
+  }
+
+  else {
+    return;
+  }
+}
+
+//Checks if the received message is good
+bool messagecheck(byte *buffer) {
+
+  //list of error messages
+  //Reduced to one char to be sent as a single bit
+  const byte noMessageReceived = 0xfb;  // 251
+  const byte messageError = 0xfc;       // 252
+  const byte allreceived = 0xfd;        // 253
+  const byte messageStart = 0xfe;       // 254
+
+  //Checking if data was sent at all using the first bit (should be 0xff)
+  if (buffer[0] != messageStart) {
+    Serial.write(noMessageReceived);
+    return 0;
+  }
+
+  byte checksum = 0;
+  for (int x = 0; x < 10; x++) { checksum += buffer[x]; }
+
+  //Checking the value of the checksum against the last received value
+  if (checksum != buffer[10]) {
+    Serial.write(checksum);
+    Serial.write(messageError);
+    return 0;
+  }
+
+  else {
+    Serial.write(allreceived);
+    return 1;
+  }
+}
 
 void loop() {
   //Checks whether Serial is connected. If this is the case, the pedal will be in update mode
-  //The loop is infinite so the pedal needs to be reset after the values are updated
-  if (Serial.available()) {
-    for(; ;){
-      Serial.read();
-      }
-    }
+  if (Serial.available()) { notesupdate(); }
 
 
   // Checking the toggle and on off switches
@@ -145,10 +225,9 @@ void loop() {
   //Romain delete for production
   updatelight(toggleSwitchPosition);
 
-
-    if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)){
-          sendmidi(toggleSwitchPosition);
-          delay(200);
-            }
+  if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)) {
+    sendmidi(toggleSwitchPosition);
+  }
+  //Saving the button position to avoid double triggers
   previousButtonSwitch = digitalRead(onOffSwitchPin);
 }
