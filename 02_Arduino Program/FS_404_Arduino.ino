@@ -1,5 +1,7 @@
 /*
+  Copyright 2024-2025
   Romain Dereu
+  Released under the MIT License
 */
 
 #include <EEPROM.h>
@@ -12,14 +14,9 @@ const int rightSwitchPin = 2;
 int onOffSwitchPin = 5;
 bool previousButtonSwitch;
 
-// The pins for the led
-const int led1 = 10;
-const int led2 = 9;
-const int led3 = 8;
+// The pin for the LED
 const int ledon = 7;
-// Switch leds are the three that change according to the switch
-//Romain delete for production
-const int switchLedNumbers[] = { led1, led2, led3 };
+
 
 // The notes that will be played. Read from Eeprom
 const int cmd1 = EEPROM.read(1);
@@ -48,8 +45,6 @@ void setup() {
    }
   */
 
-
-
   Serial.begin(31250);
 
   // Setting of switch  and ON OFF pins
@@ -58,12 +53,6 @@ void setup() {
   pinMode(onOffSwitchPin, INPUT_PULLUP);
   // Setting of led pins
   pinMode(ledon, OUTPUT);
-
-  //Romain delete production
-  pinMode(led1, OUTPUT);
-  pinMode(led2, OUTPUT);
-  pinMode(led3, OUTPUT);
-
   // The power led is always on
   digitalWrite(ledon, HIGH);
 }
@@ -81,18 +70,6 @@ int switchposition() {
   } else {
     return;
   }
-}
-
-//Romain delete for production
-void updatelight(int toggleSwitchPosition) {
-  for (int i = 0; i < 3; i++) {
-    if (i == toggleSwitchPosition) {
-      digitalWrite(switchLedNumbers[i], HIGH);
-    } else {
-      digitalWrite(switchLedNumbers[i], LOW);
-    }
-  }
-  return;
 }
 
 // Plays a MIDI note once
@@ -216,14 +193,9 @@ void loop() {
   //Checks whether Serial is connected. If this is the case, the pedal will be in update mode
   if (Serial.available()) { notesupdate(); }
 
-
   // Checking the toggle and on off switches
   int toggleSwitchPosition = switchposition();
   bool currentSwitchPosition = digitalRead(onOffSwitchPin);
-
-  //updating the light value and sending midi if the note is on
-  //Romain delete for production
-  updatelight(toggleSwitchPosition);
 
   if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)) {
     sendmidi(toggleSwitchPosition);
