@@ -85,7 +85,10 @@ void noteOn(int cmd, int pitch, int velocity) {
 // Sends note off if the message is a note
 void noteOff(int cmd, int pitch, int velocity) {
 
-  if(cmd > 0x8a && cmd < 0xA0){
+  //Note off is triggered under the following conditions
+  //A note on has been sent (not applicable to note off)
+  //The velocity is not 0 or 127 (reserved for command bits)
+  if(cmd > 0x8a && cmd < 0xA0 && velocity != 0x00 && velocity != 0x7f){
     int noteOffCmd = cmd - 0x10;
     Serial.write(noteOffCmd);
     Serial.write(pitch);
