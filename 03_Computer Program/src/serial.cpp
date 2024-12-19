@@ -32,12 +32,10 @@ bool Widget::serialRead()
         unsigned char* serialMessageByte = new unsigned char[1];
         std::memcpy(serialMessageByte,serialMessage.constData(),1);;
         if (*serialMessageByte == 0xfd){
-            ui->logPlainTextEdit->appendPlainText("Transfer successful");
             delete[] serialMessageByte;
             return 1;
             }
         else{
-            ui->logPlainTextEdit->appendPlainText("Transfer failed");
             delete[] serialMessageByte;
             return 0;
             }
@@ -49,8 +47,15 @@ bool Widget::serialRead()
 
 void Widget::on_sendto404_button_clicked()
 {
+    //Connect to the device if this is
+    if(serialDeviceIsConnected == true)
+    {
     //Getting the values of the buttons and sending them to the microcontroller
     fs404notesmessage();
+    }
+    else {
+        ui->logPlainTextEdit->appendPlainText("The pedal isn't connected. Please click on Connect");
+    }
 }
 
 
@@ -60,19 +65,19 @@ void Widget::on_connect_button_clicked()
     {
         //No connexion can be set if no ports are available
         if(QSerialPortInfo::availablePorts().isEmpty()){
-            serialDeviceIsConnected = false;
+            ui->logPlainTextEdit->appendPlainText("The pedal isn't connected. Please connect to the USB port");
+            return;
             }
 
         else{
             usbDevice->setPortName(serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].portName());
             deviceDescription = serialComPortList[ui->serialPortSelect_comboBox->currentIndex()].description();
-            ui->logPlainTextEdit->appendPlainText("connecting to: " + usbDevice->portName());
+            ui->logPlainTextEdit->appendPlainText("Connecting to: " + usbDevice->portName());
         }
         if(usbDevice->open(QIODevice::ReadWrite))
         {
             //Now the serial port is open try to set configuration
             //Depends on your boud-rate on the Device
-            //Romain remplacer tous les qDebug avant deploy
             if(!usbDevice->setBaudRate(baudrate))
                 qDebug()<<usbDevice->errorString();
 
@@ -122,8 +127,9 @@ void Widget::on_disconnect_button_clicked()
 }
 
 void Widget::fs404notesmessage(){
-    if(serialDeviceIsConnected == true)
-    {
+
+        ui->logPlainTextEdit->appendPlainText("Starting data transfer");
+
         /* Message format:
         Header       (1 byte)           - Header Byte (value 0xfe)
         Data         (9 bytes)          - Info for the three notes
@@ -164,31 +170,32 @@ void Widget::fs404notesmessage(){
         for (size_t i = 0; i < 12; i++)
             messagechar[i] = static_cast<unsigned char>(messageraw[i]);
         QByteArray messageQByte =  QByteArray::fromRawData(messagechar, sizeof(messagechar));;
+        QString  messagePlainText = QString(messageQByte.toHex(' '));
 
         bool transferwassuccessful = 0;
         int attempts = 0;
         //Making up to 10 loops if transfers aren't successful
-        do {
+        for (int x=0; x<10 && transferwassuccessful ==0 ; x++) {
             serialWrite(messageQByte);
-            //displaying the message sent
-            QString  messagePlainText = QString(messageQByte.toHex(' '));
-            ui->logPlainTextEdit->appendPlainText(messagePlainText);
-
             //trying to send the message 10 times.
             //Sending an error message if the transfer doesn't work
-            transferwassuccessful = serialRead();
+            transferwassuccessful = serialRead();            
             delay();
             attempts ++;
         }
-        while (attempts < 10 && transferwassuccessful == 0 );
 
+        if (transferwassuccessful == 1){
+            ui->logPlainTextEdit->appendPlainText("The following message was sucessfuly sent");
+            ui->logPlainTextEdit->appendPlainText(messagePlainText);
+            }
+        else  {
+            ui->logPlainTextEdit->appendPlainText("The message couldn't be saved. Please try again");
+            ui->logPlainTextEdit->appendPlainText(messagePlainText);
 
+                }
 
-    }
-    else {
-        ui->logPlainTextEdit->appendPlainText("The pedal isn't connected");
-    }
-}
+        }
+
 
 
 void delay()

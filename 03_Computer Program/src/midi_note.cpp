@@ -122,3 +122,61 @@ unsigned char Midi_note::musical_note_to_hex(int musical_note_position){
                                                  0x78, 0x79, 0x7A, 0x7B, 0x7C, 0x7D, 0x7E, 0x7F };
     return list_notes_hex[musical_note_position];
 }
+
+//Qstrings are directrly translated to note information
+void Midi_note::command_to_hex(QString command_string){
+
+
+    if (command_string == "Stop Playback"){
+        //Midi CH1 CC85 Vel 127
+        status_byte = 0xB0;
+        data_byte_1 = 0x55;
+        data_byte_2 = 0x7f;
+    }
+
+
+    else if (command_string == "Looper Undo"){
+        //Midi CH1 CC91 Vel 127
+        status_byte = 0xB0;
+        data_byte_1 = 0x5b;
+        data_byte_2 = 0x00;
+    }
+
+    else if (command_string == "Looper Redo"){
+        //Midi CH1 CC91 Vel 0
+        status_byte = 0xB0;
+        data_byte_1 = 0x5b;
+        data_byte_2 = 0x7f;
+    }
+
+    else if (command_string == "DJ Play CH1"){
+        //Midi Channel 1 CC 20 Vel 127
+        status_byte = 0xB0;
+        data_byte_1 = 0x14;
+        data_byte_2 = 0x7f;
+    }
+
+    else if (command_string == "DJ Play CH2"){
+        //Midi Channel 2 CC 20 Vel 127
+        status_byte = 0xB0;
+        data_byte_1 = 0x14;
+        data_byte_2 = 0x7f;
+    }
+
+    else if (command_string == "DJ Stop CH1"){
+        //Midi Channel 1 CC 20 Vel 0
+        status_byte = 0xB0;
+        data_byte_1 = 0x14;
+        data_byte_2 = 0x00;
+    }
+
+    else if (command_string == "DJ Stop CH2"){
+        //Midi Channel 2 CC 20 Vel0
+        status_byte = 0xB0;
+        data_byte_1 = 0x14;
+        data_byte_2 = 0x00;
+    }
+
+    else{qDebug("No command value exists for this string");}
+
+}

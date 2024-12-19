@@ -19,6 +19,9 @@ Widget::Widget(QWidget *parent)
     ui->note2->update_note_main_label(QString("Note 2"));
     ui->note3->update_note_main_label(QString("Note 3"));
 
+    //setting up pads to 1 & 3
+    ui->note2->update_note_value(1);
+    ui->note3->update_note_value(2);
 }
 
 void Widget::on_refresh_button_clicked(){getAvalilableSerialDevices();}

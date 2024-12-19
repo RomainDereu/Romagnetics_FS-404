@@ -20,8 +20,11 @@ public:
     // The other functions are defined below.
     Midi_note sendNoteInfo();
 
-    //updating the note labe:
+    //updating the note label. Used during setup:
     void update_note_main_label(QString label_text);
+
+    //updating the note combo. Used during setup:
+    void update_note_value(int combo_index);
 
 private slots:
     void on_note_list_mode_combo_currentTextChanged(const QString &arg1);

@@ -109,17 +109,18 @@ void Note_interface::setup_noteui()
         note_ui->note_padb_value_combo->addItem(QString::fromStdString(list_pads[x]));
     }
 
-    const std::vector<std::string> list_midi_b = { "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10", "10/11"};
-
     //Populating mode B midi channels
+    const std::vector<std::string> list_midi_b = { "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10", "10/11"};
     for (int x = 0; x < list_midi_b.size(); x++){
         note_ui->note_padb_midich_combo->addItem(QString::fromStdString(list_midi_b[x]));
     }
 
-
     //Populating the Command mode
-    const std::vector<std::string> list_commands = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC" };
-
+    const std::vector<std::string> list_commands = { "Stop Playback","Looper Undo", "Looper Redo",
+                                                    "DJ Play CH1", "DJ Play CH2", "DJ Pause CH1", "DJ Pause CH2" };
+    for (int x = 0; x < list_commands.size(); x++){
+        note_ui->note_command_select_label_2->addItem(QString::fromStdString(list_commands[x]));
+    }
 
 }
 
@@ -128,6 +129,7 @@ Midi_note  Note_interface::sendNoteInfo()
 {
     //Checking which UI is active
     // 0 for "SP Midi A", 1 for "SP Midi B", 2 for "SP Commands", 3 for "Midi Notes", "CC"
+    //more information on midi note in the midi_note cpp and header files
     QString activeUiCode = note_ui->note_list_mode_combo->currentText();
     Midi_note midi_note;
 
@@ -139,7 +141,6 @@ Midi_note  Note_interface::sendNoteInfo()
     }
 
     else if (activeUiCode == "SP Midi B") {
-
         midi_note = Midi_note("SP Midi B",
                               note_ui->note_padb_midich_combo->currentIndex(),
                               note_ui->note_padb_value_combo->currentIndex(),
@@ -147,10 +148,7 @@ Midi_note  Note_interface::sendNoteInfo()
     }
 
     else if (activeUiCode == "SP Commands") {
-        //Translating to hex value
-        //midi_note.status_byte = 0x01;
-        //midi_note.data_byte_1 = 0x01;
-        //midi_note.data_byte_2 = 0x01;
+        midi_note = Midi_note(note_ui->note_command_select_label_2->currentText());
     }
 
     else if  (activeUiCode == "Midi Notes") {
@@ -178,6 +176,11 @@ void Note_interface::update_note_main_label(QString label_text)
 {
     note_ui->note_main_label->setText(label_text);
     return;
+}
+
+void Note_interface::update_note_value(int combo_index)
+{
+    note_ui->note_pada_value_combo->setCurrentIndex(combo_index);
 }
 
 
