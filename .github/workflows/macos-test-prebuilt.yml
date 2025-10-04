@@ -2,7 +2,7 @@ name: macOS test build artifact
 
 on:
   workflow_run:
-    workflows: ["macOS Qt build (unsigned)"]   # EXACTLY the 'name:' of your build workflow
+    workflows: ["macOS Qt build (unsigned)"]  # must exactly match the 'name:' above
     types: [completed]
 
 permissions:
@@ -21,12 +21,14 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
           path: artifacts
-          # Avoid exact name issues (spaces etc.)
+          # Pattern matches your artifact even with spaces in the name
           pattern: "*unsigned-macOS*"
           merge-multiple: true
 
       - name: List artifacts (debug)
-        run: ls -R artifacts || true
+        run: |
+          echo "Artifacts downloaded from run ${{ github.event.workflow_run.id }}"
+          ls -R artifacts || true
 
       - name: Mount DMG (if present) and run headless
         run: |
@@ -40,14 +42,19 @@ jobs:
             VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
             APP="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1 || true)"
           fi
+          # Fallback: a raw .app in artifacts (if you ever upload it directly)
           if [ -z "$APP" ]; then
             APP=$(find artifacts -type d -name "*.app" | head -n1 || true)
           fi
-          [ -z "$APP" ] && echo "No .app found" && exit 1
+          [ -z "$APP" ] && echo "No .app found in DMG or artifacts" && exit 1
+
           BIN="$APP/Contents/MacOS/$(basename "$APP" .app)"
+          chmod +x "$BIN" || true
           export QT_QPA_PLATFORM=offscreen
           "$BIN" --help || true
           "$BIN" || true
           otool -L "$BIN" || true
           spctl --assess --type execute --verbose "$APP" || true
-          [ -n "${VOL:-}" ] && hdiutil detach "/Volumes/$VOL" || true
+
+          # Detach if mounted
+          if [ -n "${VOL:-}" ]; then hdiutil detach "/Volumes/$VOL" || true; fi

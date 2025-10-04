@@ -28,10 +28,9 @@ jobs:
         with:
           version: ${{ env.QT_VERSION }}
           target: desktop
-          modules: qtserialport      # <-- add this
+          modules: qtserialport
           cache: true
 
-      # (Optional) prove SerialPort is installed
       - name: Show Qt SerialPort cmake file
         run: |
           set -x
@@ -43,7 +42,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
             -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-            -DCMAKE_PREFIX_PATH="$Qt6_DIR"     # <-- and this
+            -DCMAKE_PREFIX_PATH="$Qt6_DIR"
 
       - name: Build
         run: cmake --build build --config $BUILD_TYPE --parallel
@@ -70,6 +69,10 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-unsigned-macOS
+          # DMG can be in repo root OR in build/, include both; also include the zip
           path: |
             *.dmg
+            build/*.dmg
             *.zip
+          if-no-files-found: warn
+          retention-days: 7
