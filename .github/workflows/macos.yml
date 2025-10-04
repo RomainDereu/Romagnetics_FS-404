@@ -1,124 +1,101 @@
-name: macOS test build artifact
+name: macOS Qt build (unsigned)
 
 on:
-  workflow_run:
-    workflows: ["macOS Qt build (unsigned)"]  # must exactly match the 'name:' above
-    types: [completed]
-
-permissions:
-  actions: read
-  contents: read
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
 jobs:
-  test:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  build:
     runs-on: macos-14
+    env:
+      APP_NAME: "Romagnetics FS-404 Companion"
+      APP_SUBDIR: "03_Computer Program/src"
+      BUILD_TYPE: Release
+      QT_VERSION: "6.8.3"
 
     steps:
-      - name: Download artifacts from the triggering build run
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - name: Install Qt (+ SerialPort)
+        uses: jurplel/install-qt-action@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-          path: artifacts
-          # Pattern matches your artifact even with spaces in the name
-          pattern: "*unsigned-macOS*"
-          merge-multiple: true
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          modules: qtserialport
+          cache: true
 
-      - name: List artifacts (debug)
+      - name: Configure (prefer qt-cmake)
         run: |
-          echo "Artifacts downloaded from run ${{ github.event.workflow_run.id }}"
-          ls -R artifacts || true
+          set -eo pipefail
+          if command -v qt-cmake >/dev/null 2>&1; then
+            qt-cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          fi
 
-      - name: Mount DMG (if present), copy app to temp, run headless (robust)
+      - name: Build
+        run: cmake --build build --config $BUILD_TYPE --parallel
+
+      - name: Locate .app
+        id: locate
         run: |
-          set -euo pipefail
-          LOG=runlog.txt
-          TMP="/tmp/fs404_app"
-          rm -rf "$TMP"; mkdir -p "$TMP"
+          set -eo pipefail
+          APP_PATH=$(find build -type d -name "*.app" | head -n 1)
+          [ -z "$APP_PATH" ] && echo "No .app found" && exit 1
+          echo "path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "Found: $APP_PATH"
 
-          # 1) Prefer DMG; else fall back to raw .app in artifacts
-          DMG=$(find artifacts -name "*.dmg" | head -n1 || true)
-          APP=""
-          VOL=""
-          if [ -n "$DMG" ]; then
-            echo "DMG=$DMG" | tee -a "$LOG"
-            BEFORE="$(ls /Volumes || true)"
-            hdiutil attach -nobrowse "$DMG" >>"$LOG" 2>&1 || true
-            AFTER="$(ls /Volumes || true)"
-            VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
-            if [ -n "$VOL" ]; then
-              echo "Mounted volume: /Volumes/$VOL" | tee -a "$LOG"
-              APP_ON_DMG="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1 || true)"
-              if [ -n "$APP_ON_DMG" ]; then
-                echo "Copying app to $TMP..." | tee -a "$LOG"
-                ditto "$APP_ON_DMG" "$TMP/$(basename "$APP_ON_DMG")" 2>&1 | tee -a "$LOG"
-                APP="$TMP/$(basename "$APP_ON_DMG")"
-              fi
-            fi
+      # Copy 'offscreen' platform plugin into the app bundle (non-fatal if not found)
+      - name: Ensure offscreen platform plugin is present
+        run: |
+          set -eo pipefail
+          APP_DIR="${{ steps.locate.outputs.path }}"
+          DEST="$APP_DIR/Contents/PlugIns/platforms"
+          mkdir -p "$DEST"
+          PLUGDIR=""
+          if command -v qtpaths >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths --plugin-dir || true)"
+          elif command -v qmake >/dev/null 2>&1; then
+            PLUGDIR="$(qmake -query QT_INSTALL_PLUGINS || true)"
           fi
-          if [ -z "$APP" ]; then
-            RAW_APP=$(find artifacts -type d -name "*.app" | head -n1 || true)
-            if [ -n "$RAW_APP" ]; then
-              echo "Copying raw app to $TMP..." | tee -a "$LOG"
-              ditto "$RAW_APP" "$TMP/$(basename "$RAW_APP")" 2>&1 | tee -a "$LOG"
-              APP="$TMP/$(basename "$RAW_APP")"
-            fi
+          PLUG=""
+          [ -n "$PLUGDIR" ] && PLUG="$PLUGDIR/platforms/libqoffscreen.dylib"
+          if [ ! -f "${PLUG:-/nonexistent}" ]; then
+            # fallback search
+            PLUG="$(find "$RUNNER_TEMP" "$GITHUB_WORKSPACE/Qt" -maxdepth 6 -name 'libqoffscreen.dylib' 2>/dev/null | head -n1 || true)"
           fi
-          [ -z "$APP" ] && echo "No .app found in DMG or artifacts" | tee -a "$LOG" && exit 1
-          echo "Using APP: $APP" | tee -a "$LOG"
+          if [ -n "$PLUG" ] && [ -f "$PLUG" ]; then
+            cp -fv "$PLUG" "$DEST/"
+            echo "Copied offscreen plugin from: $PLUG"
+          else
+            echo "WARNING: libqoffscreen.dylib not found; headless tests may skip."
+          fi
 
-          # 2) Resolve executable
-          EXE=$(defaults read "$APP/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP" .app)
-          BIN="$APP/Contents/MacOS/$EXE"
-          echo "Resolved executable: $BIN" | tee -a "$LOG"
+      - name: Bundle (macdeployqt, no signing)
+        run: |
+          set -eo pipefail
+          macdeployqt "${{ steps.locate.outputs.path }}" -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
 
-          # 3) Quarantine & perms on the writable copy
-          xattr -dr com.apple.quarantine "$APP" 2>&1 | tee -a "$LOG" || true
-          chmod +x "$BIN" 2>&1 | tee -a "$LOG" || true
+      - name: Zip the .app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "${{ steps.locate.outputs.path }}" "${{ env.APP_NAME }}.zip"
 
-          # 4) Diagnostics
-          echo "---- otool -L ----" | tee -a "$LOG"
-          otool -L "$BIN" 2>&1 | tee -a "$LOG" || true
-          echo "---- codesign -dv ----" | tee -a "$LOG"
-          codesign -dv --verbose=4 "$APP" 2>&1 | tee -a "$LOG" || true
-
-          # 5) Run with Qt plugin debug (timeouts so it can’t hang)
-          export QT_QPA_PLATFORM=offscreen
-          export QT_DEBUG_PLUGINS=1
-          export QT_LOGGING_RULES="qt.serialport.*=true"
-
-          echo "---- $EXE --help (15s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN'], '--help'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=15)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: --help did not exit in 15s")
-PY
-
-          echo "---- $EXE (headless, 20s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN']], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=20)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: app did not exit in 20s")
-PY
-
-          # 6) Detach DMG if mounted
-          if [ -n "${VOL:-}" ]; then hdiutil detach "/Volumes/$VOL" >>"$LOG" 2>&1 || true; fi
-
-
-
-      - name: Upload run log
+      - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-headless-run-log
-          path: runlog.txt like this,
+          name: ${{ env.APP_NAME }}-unsigned-macOS
+          path: |
+            *.dmg
+            build/*.dmg
+            *.zip
+          if-no-files-found: warn
+          retention-days: 7

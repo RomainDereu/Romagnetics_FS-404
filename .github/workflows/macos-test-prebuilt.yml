@@ -1,88 +1,98 @@
-name: macOS test build artifact
+name: macOS test prebuilt .app
 
 on:
-  workflow_run:
-    workflows: ["macOS Qt build (unsigned)"]  # must exactly match the 'name:' above
-    types: [completed]
-
-permissions:
-  actions: read
-  contents: read
+  workflow_dispatch:
 
 jobs:
-  test:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+  test-prebuilt:
     runs-on: macos-14
+    env:
+      # Path to your committed .app (relative to repo root) — keep it quoted
+      APP_DIR: "03_Computer Program/Mac_executable/FS-404.app"
 
     steps:
-      - name: Download artifacts from the triggering build run
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+
+      - name: Verify .app exists
+        run: |
+          ls -la "${{ env.APP_DIR }}" || { echo "App not found at ${{ env.APP_DIR }}"; exit 1; }
+          ls -la "${{ env.APP_DIR }}/Contents/MacOS" || true
+
+      # Install Qt so we can borrow the offscreen plugin if your committed app doesn't include it
+      - name: Install Qt (+ SerialPort)
+        uses: jurplel/install-qt-action@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-          path: artifacts
-          # Pattern matches your artifact even with spaces in the name
-          pattern: "*unsigned-macOS*"
-          merge-multiple: true
+          version: "6.8.3"
+          target: desktop
+          modules: qtserialport
+          cache: true
 
-      - name: List artifacts (debug)
+      - name: Ensure offscreen plugin is present (copy into committed app)
         run: |
-          echo "Artifacts downloaded from run ${{ github.event.workflow_run.id }}"
-          ls -R artifacts || true
+          set -eo pipefail
+          APP="${{ env.APP_DIR }}"
+          DEST="$APP/Contents/PlugIns/platforms"
+          mkdir -p "$DEST"
+          PLUGDIR=""
+          if command -v qtpaths >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths --plugin-dir || true)"
+          elif command -v qmake >/dev/null 2>&1; then
+            PLUGDIR="$(qmake -query QT_INSTALL_PLUGINS || true)"
+          fi
+          PLUG=""
+          [ -n "$PLUGDIR" ] && PLUG="$PLUGDIR/platforms/libqoffscreen.dylib"
+          if [ ! -f "${PLUG:-/nonexistent}" ]; then
+            PLUG="$(find "$RUNNER_TEMP" "$GITHUB_WORKSPACE/Qt" -maxdepth 6 -name 'libqoffscreen.dylib' 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -n "$PLUG" ] && [ -f "$PLUG" ]; then
+            cp -fv "$PLUG" "$DEST/"
+            echo "Copied offscreen plugin from: $PLUG"
+          else
+            echo "WARNING: libqoffscreen.dylib not found; will still try with cocoa."
+          fi
 
-      - name: Mount DMG (if present) and run headless (robust)
+      - name: Headless --help (15s timeout) + diagnostics
         run: |
-          set -euo pipefail
+          set -eo pipefail
           LOG=runlog.txt
-
-          # 1) Find an app: prefer DMG, else raw .app in artifacts
-          DMG=$(find artifacts -name "*.dmg" | head -n1 || true)
-          APP=""
-          if [ -n "$DMG" ]; then
-            echo "DMG=$DMG" | tee -a "$LOG"
-            BEFORE="$(ls /Volumes || true)"
-            hdiutil attach -nobrowse "$DMG" >>"$LOG" 2>&1
-            AFTER="$(ls /Volumes || true)"
-            VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
-            echo "Mounted volume: /Volumes/$VOL" | tee -a "$LOG"
-            APP="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1 || true)"
-          fi
-          if [ -z "$APP" ]; then
-            APP=$(find artifacts -type d -name "*.app" | head -n1 || true)
-          fi
-          [ -z "$APP" ] && echo "No .app found in DMG or artifacts" | tee -a "$LOG" && exit 1
-          echo "Using APP: $APP" | tee -a "$LOG"
-
-          # 2) Figure out the real executable name from Info.plist
+          APP="${{ env.APP_DIR }}"
           EXE=$(defaults read "$APP/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP" .app)
           BIN="$APP/Contents/MacOS/$EXE"
-          echo "Resolved executable: $BIN" | tee -a "$LOG"
-
-          # 3) Clear quarantine + ensure executable bit (safe in CI)
-          xattr -dr com.apple.quarantine "$APP" || true
           chmod +x "$BIN" || true
 
-          # 4) Extra diagnostics
-          echo "---- otool -L ----"   | tee -a "$LOG"
-          otool -L "$BIN"           | tee -a "$LOG" || true
-          echo "---- codesign -dv ----" | tee -a "$LOG"
-          codesign -dv --verbose=4 "$APP" | tee -a "$LOG" || true
+          echo "---- otool -L ----" | tee "$LOG"
+          otool -L "$BIN" 2>&1 | tee -a "$LOG" || true
 
-          # 5) Run headless with Qt plugin debug enabled
           export QT_QPA_PLATFORM=offscreen
           export QT_DEBUG_PLUGINS=1
           export QT_LOGGING_RULES="qt.serialport.*=true"
 
-          echo "---- $EXE --help ----" | tee -a "$LOG"
-          "$BIN" --help               |& tee -a "$LOG" || true
+          echo "---- $EXE --help (15s timeout) ----" | tee -a "$LOG"
+          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
+import os, subprocess
+p = subprocess.Popen([os.environ['BIN'], '--help'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+try:
+    out, _ = p.communicate(timeout=15)
+    print(out)
+except subprocess.TimeoutExpired:
+    p.kill()
+    print("TIMEOUT: --help did not exit in 15s")
+PY
 
-          echo "---- $EXE (headless) ----" | tee -a "$LOG"
-          "$BIN"                      |& tee -a "$LOG" || true
-
-          # 6) Detach DMG if we mounted one
-          if [ -n "${VOL:-}" ]; then hdiutil detach "/Volumes/$VOL" >>"$LOG" 2>&1 || true; fi
+          echo "---- $EXE (headless, 20s timeout) ----" | tee -a "$LOG"
+          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
+import os, subprocess
+p = subprocess.Popen([os.environ['BIN']], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+try:
+    out, _ = p.communicate(timeout=20)
+    print(out)
+except subprocess.TimeoutExpired:
+    p.kill()
+    print("TIMEOUT: app did not exit in 20s")
+PY
 
       - name: Upload run log
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: macOS-headless-run-log
