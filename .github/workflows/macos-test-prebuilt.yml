@@ -1,10 +1,24 @@
 name: macOS test prebuilt .app
 
 on:
+  # Run it manually if you want
   workflow_dispatch:
+  # Run it on every push to main (so both workflows run)
+  push:
+    branches: [ main ]
+  # Also auto-run right after the build workflow completes
+  workflow_run:
+    workflows: ["macOS Qt build (unsigned)"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
 
 jobs:
   test-prebuilt:
+    # If triggered by workflow_run, only proceed when the build succeeded
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-14
     env:
       APP_DIR: "03_Computer Program/Mac_executable/FS-404.app"
