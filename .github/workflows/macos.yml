@@ -31,18 +31,44 @@ jobs:
           modules: qtserialport
           cache: true
 
+      # Resolve Qt paths without relying on Qt6_DIR (writes to $GITHUB_ENV)
+      - name: Resolve Qt paths
+        run: |
+          set -eo pipefail
+          QMAKE="$(command -v qmake || true)"
+          if [ -n "$QMAKE" ]; then
+            QT_PREFIX="$(cd "$(dirname "$QMAKE")/.." && pwd)"
+            echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
+            echo "QT_PLUGIN_DIR=$QT_PREFIX/plugins" >> "$GITHUB_ENV"
+            echo "QT_CMAKE_DIR=$QT_PREFIX/lib/cmake/Qt6" >> "$GITHUB_ENV"
+          fi
+          command -v qt-cmake && echo "Found qt-cmake" || echo "qt-cmake not found (will fall back to cmake)"
+
       - name: Show Qt SerialPort cmake file
         run: |
-          set -x
-          find "$Qt6_DIR/.." -type f -name "Qt6SerialPortConfig.cmake" | head -n 5
+          set -eo pipefail
+          if [ -n "${QT_CMAKE_DIR:-}" ]; then
+            find "$QT_CMAKE_DIR/.." -type f -name "Qt6SerialPortConfig.cmake" | head -n 5 || true
+          else
+            find "$GITHUB_WORKSPACE/Qt" -type f -name "Qt6SerialPortConfig.cmake" | head -n 5 || true
+          fi
 
-      - name: Configure (arm64)
+      - name: Configure (prefer qt-cmake)
         run: |
-          cmake -S "${{ env.APP_SUBDIR }}" -B build \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-            -DCMAKE_OSX_ARCHITECTURES=arm64 \
-            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
-            -DCMAKE_PREFIX_PATH="$Qt6_DIR"
+          set -eo pipefail
+          if command -v qt-cmake >/dev/null 2>&1; then
+            qt-cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # fallback: standard cmake with discovered Qt cmake dir, if available
+            cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+              ${QT_CMAKE_DIR:+-DCMAKE_PREFIX_PATH="$QT_CMAKE_DIR"}
+          fi
 
       - name: Build
         run: cmake --build build --config $BUILD_TYPE --parallel
@@ -58,18 +84,27 @@ jobs:
       # Ensure offscreen platform plugin is bundled BEFORE making the DMG
       - name: Ensure offscreen platform plugin is present (in build tree)
         run: |
-          set -euo pipefail
+          set -eo pipefail
           APP_DIR="${{ steps.locate.outputs.path }}"
           DEST="$APP_DIR/Contents/PlugIns/platforms"
           mkdir -p "$DEST"
-          # Discover plugin directory via qmake, with fallback search
-          QMAKE="$Qt6_DIR/../../../bin/qmake"
-          if [ -x "$QMAKE" ]; then
-            PLUGDIR="$($QMAKE -query QT_INSTALL_PLUGINS || true)"
+          # Try qtpaths/qmake first, then fallback to find
+          if command -v qtpaths >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths --plugin-dir || true)"
+          elif command -v qtpaths6 >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths6 --plugin-dir || true)"
+          elif command -v qmake >/dev/null 2>&1; then
+            PLUGDIR="$(qmake -query QT_INSTALL_PLUGINS || true)"
+          else
+            PLUGDIR=""
           fi
-          PLUG="${PLUGDIR:-}/platforms/libqoffscreen.dylib"
-          if [ ! -f "${PLUG:-/nonexistent}" ]; then
-            PLUG="$(find "$Qt6_DIR/.." -maxdepth 6 -name 'libqoffscreen.dylib' | head -n1 || true)"
+          PLUG="${PLUGDIR:+$PLUGDIR/}platforms/libqoffscreen.dylib"
+          if [ ! -f "$PLUG" ]; then
+            # fallback search around the installed Qt
+            ROOTS=""
+            [ -n "${QT_PREFIX:-}" ] && ROOTS="$ROOTS $QT_PREFIX"
+            ROOTS="$ROOTS $GITHUB_WORKSPACE/Qt $RUNNER_TEMP/Qt"
+            PLUG="$(find $ROOTS -maxdepth 6 -name 'libqoffscreen.dylib' 2>/dev/null | head -n1 || true)"
           fi
           if [ -z "$PLUG" ]; then
             echo "WARNING: libqoffscreen.dylib not found; headless tests may fail."
@@ -82,7 +117,7 @@ jobs:
       # Quick headless smoke test from the build tree (uses offscreen)
       - name: Headless smoke test (build tree)
         run: |
-          set -euo pipefail
+          set -eo pipefail
           APP_PATH="${{ steps.locate.outputs.path }}"
           EXE=$(defaults read "$APP_PATH/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP_PATH" .app)
           BIN="$APP_PATH/Contents/MacOS/$EXE"
@@ -97,13 +132,13 @@ jobs:
 
       - name: Bundle (macdeployqt, no signing)
         run: |
-          set -euo pipefail
+          set -eo pipefail
           macdeployqt "${{ steps.locate.outputs.path }}" -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
 
       # Verify the DMG contains platform plugins (non-fatal diagnostic)
       - name: Verify platform plugins inside DMG
         run: |
-          set -euo pipefail
+          set -eo pipefail
           DMG=$(ls -1t *.dmg build/*.dmg 2>/dev/null | head -n1 || true)
           if [ -z "$DMG" ]; then
             echo "No DMG found (macdeployqt may have failed)."; exit 0
