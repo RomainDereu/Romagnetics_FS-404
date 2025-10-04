@@ -1,0 +1,67 @@
+name: macOS Qt build (unsigned)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      APP_NAME: "Romagnetics FS-404 Companion"
+      APP_SUBDIR: "03_Computer Program/src" 
+      BUILD_TYPE: Release
+      QT_VERSION: "6.8.3"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # (Optional) quick sanity listing to confirm your path
+      - name: Show workspace
+        run: |
+          pwd
+          ls -la
+          ls -la "${{ env.APP_SUBDIR }}" || true
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+
+      - name: Configure (arm64)
+        run: |
+          cmake -S "${{ env.APP_SUBDIR }}" -B build \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+
+      - name: Build
+        run: cmake --build build --config $BUILD_TYPE --parallel
+
+      - name: Locate .app (portable find)
+        id: locate
+        run: |
+          APP_PATH=$(find build -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then echo "No .app found" && exit 1; fi
+          echo "path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "Found: $APP_PATH"
+
+      - name: Bundle (macdeployqt, no signing)
+        run: |
+          macdeployqt "${{ steps.locate.outputs.path }}" \
+            -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
+
+      - name: Zip the .app
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            "${{ steps.locate.outputs.path }}" "${{ env.APP_NAME }}.zip"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-unsigned-macOS
+          path: |
+            *.dmg
+            *.zip
