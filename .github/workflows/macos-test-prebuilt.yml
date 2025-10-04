@@ -7,7 +7,6 @@ jobs:
   test-prebuilt:
     runs-on: macos-14
     env:
-      # Path to your committed .app (relative to repo root) — keep it quoted
       APP_DIR: "03_Computer Program/Mac_executable/FS-404.app"
 
     steps:
@@ -18,7 +17,6 @@ jobs:
           ls -la "${{ env.APP_DIR }}" || { echo "App not found at ${{ env.APP_DIR }}"; exit 1; }
           ls -la "${{ env.APP_DIR }}/Contents/MacOS" || true
 
-      # Install Qt so we can borrow the offscreen plugin if your committed app doesn't include it
       - name: Install Qt (+ SerialPort)
         uses: jurplel/install-qt-action@v4
         with:

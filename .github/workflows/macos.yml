@@ -68,7 +68,6 @@ jobs:
           PLUG=""
           [ -n "$PLUGDIR" ] && PLUG="$PLUGDIR/platforms/libqoffscreen.dylib"
           if [ ! -f "${PLUG:-/nonexistent}" ]; then
-            # fallback search
             PLUG="$(find "$RUNNER_TEMP" "$GITHUB_WORKSPACE/Qt" -maxdepth 6 -name 'libqoffscreen.dylib' 2>/dev/null | head -n1 || true)"
           fi
           if [ -n "$PLUG" ] && [ -f "$PLUG" ]; then
