@@ -52,6 +52,7 @@ jobs:
           echo "path=$APP_PATH" >> $GITHUB_OUTPUT
           echo "Found: $APP_PATH"
 
+      # Copy 'offscreen' platform plugin into the app bundle (non-fatal if not found)
       - name: Ensure offscreen platform plugin is present
         run: |
           set -eo pipefail

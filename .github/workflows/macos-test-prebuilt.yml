@@ -14,18 +14,44 @@ permissions:
 
 jobs:
   test-prebuilt:
+    # If triggered by workflow_run, only proceed when the build succeeded
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-14
     env:
+      # Update this if you keep a committed .app at a fixed location:
       APP_DIR: "03_Computer Program/Mac_executable/FS-404.app"
 
     steps:
+      # Fetch LFS too, in case the .app was added via Git LFS
       - uses: actions/checkout@v4
+        with:
+          lfs: true
 
-      - name: Verify .app exists
+      - name: Show repo layout (debug)
         run: |
-          ls -la "${{ env.APP_DIR }}" || { echo "App not found at ${{ env.APP_DIR }}"; exit 1; }
-          ls -la "${{ env.APP_DIR }}/Contents/MacOS" || true
+          pwd
+          ls -la
+          ls -la "03_Computer Program" || true
+          ls -la "03_Computer Program/Mac_executable" || true
+
+      # Find the app: prefer APP_DIR, else auto-discover first *.app in repo
+      - name: Find app bundle
+        id: findapp
+        run: |
+          set -eo pipefail
+          APP="${{ env.APP_DIR }}"
+          if [ -d "$APP" ]; then
+            echo "Using APP_DIR: $APP"
+            echo "app=$APP" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "APP_DIR not found, auto-searching for .app..."
+          APP_FOUND=$(find . -type d -name "*.app" | head -n 1 || true)
+          if [ -z "$APP_FOUND" ]; then
+            echo "No .app found in repository checkout."; exit 1
+          fi
+          echo "Found app at: $APP_FOUND"
+          echo "app=$APP_FOUND" >> $GITHUB_OUTPUT
 
       - name: Install Qt (+ SerialPort)
         uses: jurplel/install-qt-action@v4
@@ -35,10 +61,10 @@ jobs:
           modules: qtserialport
           cache: true
 
-      - name: Ensure offscreen plugin is present (copy into committed app)
+      - name: Ensure offscreen plugin is present (copy into app)
         run: |
           set -eo pipefail
-          APP="${{ env.APP_DIR }}"
+          APP="${{ steps.findapp.outputs.app }}"
           DEST="$APP/Contents/PlugIns/platforms"
           mkdir -p "$DEST"
           PLUGDIR=""
@@ -63,7 +89,7 @@ jobs:
         run: |
           set -eo pipefail
           LOG=runlog.txt
-          APP="${{ env.APP_DIR }}"
+          APP="${{ steps.findapp.outputs.app }}"
           EXE=$(defaults read "$APP/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP" .app)
           BIN="$APP/Contents/MacOS/$EXE"
           chmod +x "$BIN" || true
@@ -76,10 +102,10 @@ jobs:
           export QT_LOGGING_RULES="qt.serialport.*=true"
 
           echo "---- $EXE --help (15s timeout) ----" | tee -a "$LOG"
-          python3 -c 'import os,subprocess,threading; bin=os.environ.get("BIN") or "'"$BIN"'"; p=subprocess.Popen([bin,"--help"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); t=threading.Timer(15, p.kill); t.start(); out=p.communicate()[0]; print(out if out else "");' 2>&1 | tee -a "$LOG"
+          python3 -c 'import subprocess,threading; p=subprocess.Popen(["'"$BIN"'","--help"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); t=threading.Timer(15,p.kill); t.start(); out=p.communicate()[0]; print(out or "");' 2>&1 | tee -a "$LOG"
 
           echo "---- $EXE (headless, 20s timeout) ----" | tee -a "$LOG"
-          python3 -c 'import os,subprocess,threading,time; bin=os.environ.get("BIN") or "'"$BIN"'"; p=subprocess.Popen([bin], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); start=time.time(); t=threading.Timer(20, p.kill); t.start(); out=p.communicate()[0]; print(out if out else "");  print("TIMEOUT: app did not exit in 20s") if time.time()-start>=20 else None' 2>&1 | tee -a "$LOG"
+          python3 -c 'import subprocess,threading,time; start=time.time(); p=subprocess.Popen(["'"$BIN"'"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); t=threading.Timer(20,p.kill); t.start(); out=p.communicate()[0]; print(out or ""); print("TIMEOUT: app did not exit in 20s") if time.time()-start>=20 else None' 2>&1 | tee -a "$LOG"
 
       - name: Upload run log
         if: always()
