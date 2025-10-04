@@ -55,7 +55,7 @@ jobs:
           echo "path=$APP_PATH" >> $GITHUB_OUTPUT
           echo "Found: $APP_PATH"
 
-      # --- NEW: ensure offscreen platform plugin is bundled in the app BEFORE making the DMG ---
+      # Ensure offscreen platform plugin is bundled BEFORE making the DMG
       - name: Ensure offscreen platform plugin is present (in build tree)
         run: |
           set -euo pipefail
@@ -80,7 +80,7 @@ jobs:
           echo "Offscreen plugin copied to: $DEST"
           ls -la "$DEST"
 
-      # --- NEW: quick headless smoke test from the build tree (uses offscreen) ---
+      # Quick headless smoke test from the build tree (uses offscreen)
       - name: Headless smoke test (build tree)
         run: |
           set -euo pipefail
@@ -101,7 +101,7 @@ jobs:
           macdeployqt "${{ steps.locate.outputs.path }}" \
             -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
 
-      # --- NEW: verify the DMG contains platform plugins (including offscreen we copied) ---
+      # Verify the DMG contains platform plugins (including offscreen we copied)
       - name: Verify platform plugins inside DMG
         run: |
           set -euo pipefail
@@ -112,7 +112,7 @@ jobs:
           AFTER="$(ls /Volumes || true)"
           VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
           echo "Mounted /Volumes/$VOL"
-          ls -la "/Volumes/$VOL"/*.app/Contents/PlugIns/platforms" || true
+          ls -la "/Volumes/$VOL"/*.app/Contents/PlugIns/platforms || true
           hdiutil detach "/Volumes/$VOL" || true
 
       - name: Zip the .app
