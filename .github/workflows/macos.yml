@@ -1,41 +1,191 @@
+name: macOS Qt build (unsigned)
 
-Hello Benjamin
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
 
-Thank you very much for your message!
+jobs:
+  build:
+    runs-on: macos-14
+    env:
+      APP_NAME: "Romagnetics FS-404 Companion"
+      APP_SUBDIR: "03_Computer Program/src"
+      BUILD_TYPE: Release
+      QT_VERSION: "6.8.3"
 
-Regarding shipping
-The DHL packet will leave Japan at the beginning of next week.
-Once it reaches the United States, it will be updated with the following tracking number: 
-9200190328575268075142
+    steps:
+      - uses: actions/checkout@v4
 
-I just tested your FS-404. Everything works great but don't hesitate to contact me if you have any issues.
+      - name: Show workspace
+        run: |
+          pwd
+          ls -la
+          ls -la "${{ env.APP_SUBDIR }}" || true
 
-Regarding the mac application.
-I have made a Mac version available on GitHub at the following address: 
+      - name: Install Qt (+ SerialPort)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          target: desktop
+          modules: qtserialport
+          cache: true
 
-Because the app is unsigned, the first launch will need a one-time bypass:
-Right-click the app → Open → Open (subsequent launches will function normally).
+      # Resolve Qt paths without relying on Qt6_DIR (writes to $GITHUB_ENV)
+      - name: Resolve Qt paths
+        run: |
+          set -eo pipefail
+          QMAKE="$(command -v qmake || true)"
+          if [ -n "$QMAKE" ]; then
+            QT_PREFIX="$(cd "$(dirname "$QMAKE")/.." && pwd)"
+            echo "QT_PREFIX=$QT_PREFIX" >> "$GITHUB_ENV"
+            echo "QT_PLUGIN_DIR=$QT_PREFIX/plugins" >> "$GITHUB_ENV"
+            echo "QT_CMAKE_DIR=$QT_PREFIX/lib/cmake/Qt6" >> "$GITHUB_ENV"
+          fi
+          command -v qt-cmake && echo "Found qt-cmake" || echo "qt-cmake not found (will fall back to cmake)"
 
-This is normal and will only happen on the first time you open the app.
-I tested it with your pedal using a virtual instance but let me know if you can't use the app.
+      - name: Show Qt SerialPort cmake file
+        run: |
+          set -eo pipefail
+          if [ -n "${QT_CMAKE_DIR:-}" ]; then
+            find "$QT_CMAKE_DIR/.." -type f -name "Qt6SerialPortConfig.cmake" | head -n 5 || true
+          else
+            find "$GITHUB_WORKSPACE/Qt" -type f -name "Qt6SerialPortConfig.cmake" | head -n 5 || true
+          fi
 
-Regarding the next version.
-The next version will have the following additions:
-*Please note that this version should ship during the first half of 2026.
- I'll send you all the updating steps once the version is ready.
+      - name: Configure (prefer qt-cmake)
+        run: |
+          set -eo pipefail
+          if command -v qt-cmake >/dev/null 2>&1; then
+            qt-cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
+          else
+            # fallback: standard cmake with discovered Qt cmake dir, if available
+            cmake -S "${{ env.APP_SUBDIR }}" -B build \
+              -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0 \
+              ${QT_CMAKE_DIR:+-DCMAKE_PREFIX_PATH="$QT_CMAKE_DIR"}
+          fi
 
-- Toggling back and forth between the pads:
-This mode will have two parameters:
-Base pad: Choosing the first pad that will be played on
-Types: Increase: Starting from the base pad and increasing (going through banks)
-       Decrease: Starting from the base pad and decreasing (going through banks)
-       Reset: Going back to the first pad
-Any type can be added as one of the three switches, so you can have any combination you want.
-  
-- Configurable kill switch
+      - name: Build
+        run: cmake --build build --config $BUILD_TYPE --parallel
 
-The kill switch can either be selected as one of the three switch positions or through a configurable timer from 500ms to 5 seconds (configurable in the companion app).
+      - name: Locate .app (portable find)
+        id: locate
+        run: |
+          APP_PATH=$(find build -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then echo "No .app found" && exit 1; fi
+          echo "path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "Found: $APP_PATH"
 
-Thanks in advance and best regards!
+      # Ensure offscreen platform plugin is bundled BEFORE making the DMG
+      - name: Ensure offscreen platform plugin is present (in build tree)
+        run: |
+          set -eo pipefail
+          APP_DIR="${{ steps.locate.outputs.path }}"
+          DEST="$APP_DIR/Contents/PlugIns/platforms"
+          mkdir -p "$DEST"
+          # Try qtpaths/qmake first, then fallback to find
+          if command -v qtpaths >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths --plugin-dir || true)"
+          elif command -v qtpaths6 >/dev/null 2>&1; then
+            PLUGDIR="$(qtpaths6 --plugin-dir || true)"
+          elif command -v qmake >/dev/null 2>&1; then
+            PLUGDIR="$(qmake -query QT_INSTALL_PLUGINS || true)"
+          else
+            PLUGDIR=""
+          fi
+          PLUG="${PLUGDIR:+$PLUGDIR/}platforms/libqoffscreen.dylib"
+          if [ ! -f "$PLUG" ]; then
+            # fallback search around the installed Qt
+            ROOTS=""
+            [ -n "${QT_PREFIX:-}" ] && ROOTS="$ROOTS $QT_PREFIX"
+            ROOTS="$ROOTS $GITHUB_WORKSPACE/Qt $RUNNER_TEMP/Qt"
+            PLUG="$(find $ROOTS -maxdepth 6 -name 'libqoffscreen.dylib' 2>/dev/null | head -n1 || true)"
+          fi
+          if [ -z "$PLUG" ]; then
+            echo "WARNING: libqoffscreen.dylib not found; headless tests may fail."
+          else
+            cp -fv "$PLUG" "$DEST/"
+            echo "Offscreen plugin copied from: $PLUG"
+          fi
+          ls -la "$DEST" || true
 
-Romain
+      # Quick headless smoke test from the build tree (uses offscreen)
+      - name: Headless smoke test (build tree)
+        run: |
+          set -eo pipefail
+          APP_PATH="${{ steps.locate.outputs.path }}"
+          EXE=$(defaults read "$APP_PATH/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP_PATH" .app)
+          BIN="$APP_PATH/Contents/MacOS/$EXE"
+          export QT_QPA_PLATFORM=offscreen
+          export QT_DEBUG_PLUGINS=1
+          echo "Running: $BIN --help"
+          "$BIN" --help || true
+          echo "Running: $BIN"
+          "$BIN" || true
+          echo "---- Linked frameworks ----"
+          otool -L "$BIN" || true
+
+      - name: Bundle (macdeployqt, no signing)
+        run: |
+          set -eo pipefail
+          macdeployqt "${{ steps.locate.outputs.path }}" -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
+
+      # Verify the DMG contains platform plugins (non-fatal diagnostic)
+      - name: Verify platform plugins inside DMG
+        run: |
+          set -eo pipefail
+          DMG=$(ls -1t *.dmg build/*.dmg 2>/dev/null | head -n1 || true)
+          if [ -z "$DMG" ]; then
+            echo "No DMG found (macdeployqt may have failed)."; exit 0
+          fi
+          echo "DMG=$DMG"
+          BEFORE="$(ls /Volumes || true)"
+          if ! hdiutil attach -nobrowse "$DMG" >/tmp/mount.txt 2>&1; then
+            echo "Could not mount DMG (diagnostic step only)."; exit 0
+          fi
+          AFTER="$(ls /Volumes || true)"
+          VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
+          echo "Mounted /Volumes/$VOL"
+          ls -la "/Volumes/$VOL"/*.app/Contents/PlugIns/platforms || true
+          hdiutil detach "/Volumes/$VOL" || true
+
+      # Zip the .app (best-effort so we still get an artifact if DMG fails)
+      - name: Zip the .app
+        if: always()
+        run: |
+          APP_PATH="${{ steps.locate.outputs.path }}"
+          if [ -d "$APP_PATH" ]; then
+            ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "${{ env.APP_NAME }}.zip" || true
+          else
+            echo "No .app to zip (skipping)."
+          fi
+
+      # Upload artifacts even if earlier steps failed
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-unsigned-macOS
+          path: |
+            *.dmg
+            build/*.dmg
+            *.zip
+          if-no-files-found: warn
+          retention-days: 7
+
+      # Upload logs (best-effort)
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            /tmp/mount.txt
+            build/CMakeFiles/CMakeError.log
+            build/CMakeFiles/CMakeOutput.log
+          if-no-files-found: ignore
