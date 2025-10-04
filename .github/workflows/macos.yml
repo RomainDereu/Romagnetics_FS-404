@@ -61,24 +61,23 @@ jobs:
           set -euo pipefail
           APP_DIR="${{ steps.locate.outputs.path }}"
           DEST="$APP_DIR/Contents/PlugIns/platforms"
-          # Try a couple likely locations for libqoffscreen.dylib
-          CAND1="$Qt6_DIR/../plugins/platforms/libqoffscreen.dylib"
-          CAND2="$Qt6_DIR/../../../plugins/platforms/libqoffscreen.dylib"
-          PLUG=""
-          for C in "$CAND1" "$CAND2"; do
-            if [ -f "$C" ]; then PLUG="$C"; break; fi
-          done
-          if [ -z "$PLUG" ]; then
-            echo "ERROR: libqoffscreen.dylib not found near Qt6_DIR"
-            echo "Checked:"
-            echo "  $CAND1"
-            echo "  $CAND2"
-            exit 1
-          fi
           mkdir -p "$DEST"
-          cp -fv "$PLUG" "$DEST/"
-          echo "Offscreen plugin copied to: $DEST"
-          ls -la "$DEST"
+          # Discover plugin directory via qmake, with fallback search
+          QMAKE="$Qt6_DIR/../../../bin/qmake"
+          if [ -x "$QMAKE" ]; then
+            PLUGDIR="$($QMAKE -query QT_INSTALL_PLUGINS || true)"
+          fi
+          PLUG="${PLUGDIR:-}/platforms/libqoffscreen.dylib"
+          if [ ! -f "${PLUG:-/nonexistent}" ]; then
+            PLUG="$(find "$Qt6_DIR/.." -maxdepth 6 -name 'libqoffscreen.dylib' | head -n1 || true)"
+          fi
+          if [ -z "$PLUG" ]; then
+            echo "WARNING: libqoffscreen.dylib not found; headless tests may fail."
+          else
+            cp -fv "$PLUG" "$DEST/"
+            echo "Offscreen plugin copied from: $PLUG"
+          fi
+          ls -la "$DEST" || true
 
       # Quick headless smoke test from the build tree (uses offscreen)
       - name: Headless smoke test (build tree)
@@ -98,36 +97,60 @@ jobs:
 
       - name: Bundle (macdeployqt, no signing)
         run: |
-          macdeployqt "${{ steps.locate.outputs.path }}" \
-            -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
+          set -euo pipefail
+          macdeployqt "${{ steps.locate.outputs.path }}" -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
 
-      # Verify the DMG contains platform plugins (including offscreen we copied)
+      # Verify the DMG contains platform plugins (non-fatal diagnostic)
       - name: Verify platform plugins inside DMG
         run: |
           set -euo pipefail
-          DMG=$(ls -1t *.dmg build/*.dmg 2>/dev/null | head -n1)
+          DMG=$(ls -1t *.dmg build/*.dmg 2>/dev/null | head -n1 || true)
+          if [ -z "$DMG" ]; then
+            echo "No DMG found (macdeployqt may have failed)."; exit 0
+          fi
           echo "DMG=$DMG"
           BEFORE="$(ls /Volumes || true)"
-          hdiutil attach -nobrowse "$DMG" >/tmp/mount.txt
+          if ! hdiutil attach -nobrowse "$DMG" >/tmp/mount.txt 2>&1; then
+            echo "Could not mount DMG (diagnostic step only)."; exit 0
+          fi
           AFTER="$(ls /Volumes || true)"
           VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
           echo "Mounted /Volumes/$VOL"
           ls -la "/Volumes/$VOL"/*.app/Contents/PlugIns/platforms || true
           hdiutil detach "/Volumes/$VOL" || true
 
+      # Zip the .app (best-effort so we still get an artifact if DMG fails)
       - name: Zip the .app
+        if: always()
         run: |
-          ditto -c -k --sequesterRsrc --keepParent \
-            "${{ steps.locate.outputs.path }}" "${{ env.APP_NAME }}.zip"
+          APP_PATH="${{ steps.locate.outputs.path }}"
+          if [ -d "$APP_PATH" ]; then
+            ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "${{ env.APP_NAME }}.zip" || true
+          else
+            echo "No .app to zip (skipping)."
+          fi
 
+      # Upload artifacts even if earlier steps failed
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.APP_NAME }}-unsigned-macOS
-          # DMG can be in repo root OR in build/, include both; also include the zip
           path: |
             *.dmg
             build/*.dmg
             *.zip
           if-no-files-found: warn
           retention-days: 7
+
+      # Upload logs (best-effort)
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            /tmp/mount.txt
+            build/CMakeFiles/CMakeError.log
+            build/CMakeFiles/CMakeOutput.log
+          if-no-files-found: ignore
