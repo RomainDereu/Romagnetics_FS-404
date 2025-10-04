@@ -1,12 +1,9 @@
 name: macOS test prebuilt .app
 
 on:
-  # Run it manually if you want
   workflow_dispatch:
-  # Run it on every push to main (so both workflows run)
   push:
     branches: [ main ]
-  # Also auto-run right after the build workflow completes
   workflow_run:
     workflows: ["macOS Qt build (unsigned)"]
     types: [completed]
@@ -17,7 +14,6 @@ permissions:
 
 jobs:
   test-prebuilt:
-    # If triggered by workflow_run, only proceed when the build succeeded
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: macos-14
     env:
@@ -80,28 +76,10 @@ jobs:
           export QT_LOGGING_RULES="qt.serialport.*=true"
 
           echo "---- $EXE --help (15s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN'], '--help'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=15)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: --help did not exit in 15s")
-PY
+          python3 -c 'import os,subprocess,threading; bin=os.environ.get("BIN") or "'"$BIN"'"; p=subprocess.Popen([bin,"--help"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); t=threading.Timer(15, p.kill); t.start(); out=p.communicate()[0]; print(out if out else "");' 2>&1 | tee -a "$LOG"
 
           echo "---- $EXE (headless, 20s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN']], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=20)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: app did not exit in 20s")
-PY
+          python3 -c 'import os,subprocess,threading,time; bin=os.environ.get("BIN") or "'"$BIN"'"; p=subprocess.Popen([bin], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True); start=time.time(); t=threading.Timer(20, p.kill); t.start(); out=p.communicate()[0]; print(out if out else "");  print("TIMEOUT: app did not exit in 20s") if time.time()-start>=20 else None' 2>&1 | tee -a "$LOG"
 
       - name: Upload run log
         if: always()
