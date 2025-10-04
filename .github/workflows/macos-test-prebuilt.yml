@@ -30,92 +30,57 @@ jobs:
           echo "Artifacts downloaded from run ${{ github.event.workflow_run.id }}"
           ls -R artifacts || true
 
-      - name: Mount DMG (if present), copy app to temp, run headless (robust)
+      - name: Mount DMG (if present) and run headless (robust)
         run: |
           set -euo pipefail
           LOG=runlog.txt
-          TMP="/tmp/fs404_app"
-          rm -rf "$TMP"; mkdir -p "$TMP"
 
-          # 1) Prefer DMG; else fall back to raw .app in artifacts
+          # 1) Find an app: prefer DMG, else raw .app in artifacts
           DMG=$(find artifacts -name "*.dmg" | head -n1 || true)
           APP=""
-          VOL=""
           if [ -n "$DMG" ]; then
             echo "DMG=$DMG" | tee -a "$LOG"
             BEFORE="$(ls /Volumes || true)"
-            hdiutil attach -nobrowse "$DMG" >>"$LOG" 2>&1 || true
+            hdiutil attach -nobrowse "$DMG" >>"$LOG" 2>&1
             AFTER="$(ls /Volumes || true)"
             VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
-            if [ -n "$VOL" ]; then
-              echo "Mounted volume: /Volumes/$VOL" | tee -a "$LOG"
-              APP_ON_DMG="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1 || true)"
-              if [ -n "$APP_ON_DMG" ]; then
-                echo "Copying app to $TMP..." | tee -a "$LOG"
-                ditto "$APP_ON_DMG" "$TMP/$(basename "$APP_ON_DMG")" 2>&1 | tee -a "$LOG"
-                APP="$TMP/$(basename "$APP_ON_DMG")"
-              fi
-            fi
+            echo "Mounted volume: /Volumes/$VOL" | tee -a "$LOG"
+            APP="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1 || true)"
           fi
           if [ -z "$APP" ]; then
-            RAW_APP=$(find artifacts -type d -name "*.app" | head -n1 || true)
-            if [ -n "$RAW_APP" ]; then
-              echo "Copying raw app to $TMP..." | tee -a "$LOG"
-              ditto "$RAW_APP" "$TMP/$(basename "$RAW_APP")" 2>&1 | tee -a "$LOG"
-              APP="$TMP/$(basename "$RAW_APP")"
-            fi
+            APP=$(find artifacts -type d -name "*.app" | head -n1 || true)
           fi
           [ -z "$APP" ] && echo "No .app found in DMG or artifacts" | tee -a "$LOG" && exit 1
           echo "Using APP: $APP" | tee -a "$LOG"
 
-          # 2) Resolve executable
+          # 2) Figure out the real executable name from Info.plist
           EXE=$(defaults read "$APP/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP" .app)
           BIN="$APP/Contents/MacOS/$EXE"
           echo "Resolved executable: $BIN" | tee -a "$LOG"
 
-          # 3) Quarantine & perms on the writable copy
-          xattr -dr com.apple.quarantine "$APP" 2>&1 | tee -a "$LOG" || true
-          chmod +x "$BIN" 2>&1 | tee -a "$LOG" || true
+          # 3) Clear quarantine + ensure executable bit (safe in CI)
+          xattr -dr com.apple.quarantine "$APP" || true
+          chmod +x "$BIN" || true
 
-          # 4) Diagnostics
-          echo "---- otool -L ----" | tee -a "$LOG"
-          otool -L "$BIN" 2>&1 | tee -a "$LOG" || true
+          # 4) Extra diagnostics
+          echo "---- otool -L ----"   | tee -a "$LOG"
+          otool -L "$BIN"           | tee -a "$LOG" || true
           echo "---- codesign -dv ----" | tee -a "$LOG"
-          codesign -dv --verbose=4 "$APP" 2>&1 | tee -a "$LOG" || true
+          codesign -dv --verbose=4 "$APP" | tee -a "$LOG" || true
 
-          # 5) Run with Qt plugin debug (timeouts so it can’t hang)
+          # 5) Run headless with Qt plugin debug enabled
           export QT_QPA_PLATFORM=offscreen
           export QT_DEBUG_PLUGINS=1
           export QT_LOGGING_RULES="qt.serialport.*=true"
 
-          echo "---- $EXE --help (15s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN'], '--help'], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=15)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: --help did not exit in 15s")
-PY
+          echo "---- $EXE --help ----" | tee -a "$LOG"
+          "$BIN" --help               |& tee -a "$LOG" || true
 
-          echo "---- $EXE (headless, 20s timeout) ----" | tee -a "$LOG"
-          BIN="$BIN" python3 - <<'PY' 2>&1 | tee -a runlog.txt
-import os, subprocess
-p = subprocess.Popen([os.environ['BIN']], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-try:
-    out, _ = p.communicate(timeout=20)
-    print(out)
-except subprocess.TimeoutExpired:
-    p.kill()
-    print("TIMEOUT: app did not exit in 20s")
-PY
+          echo "---- $EXE (headless) ----" | tee -a "$LOG"
+          "$BIN"                      |& tee -a "$LOG" || true
 
-          # 6) Detach DMG if mounted
+          # 6) Detach DMG if we mounted one
           if [ -n "${VOL:-}" ]; then hdiutil detach "/Volumes/$VOL" >>"$LOG" 2>&1 || true; fi
-
-
 
       - name: Upload run log
         uses: actions/upload-artifact@v4
