@@ -1,0 +1,57 @@
+name: macOS test build artifact
+
+on:
+  workflow_dispatch:
+    inputs:
+      run-id:
+        description: "Actions run ID to fetch artifacts from (leave empty to use latest on main)"
+        required: false
+        default: ""
+
+jobs:
+  test-artifact:
+    runs-on: macos-14
+    steps:
+      - name: Find run ID (latest on main if none provided)
+        id: pick
+        run: |
+          if [ -z "${{ inputs.run-id }}" ]; then
+            RUN_ID=$(gh run list --branch main --workflow "macOS Qt build (unsigned)" --json databaseId --limit 1 | jq -r '.[0].databaseId')
+          else
+            RUN_ID="${{ inputs.run-id }}"
+          fi
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Download artifacts from build run
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.pick.outputs.run_id }}
+          path: artifacts
+
+      - name: Inspect artifacts
+        run: |
+          ls -R artifacts
+
+      # If you want to run from the DMG:
+      - name: Mount DMG and run headless
+        run: |
+          DMG=$(find artifacts -name "*.dmg" | head -n1)
+          echo "DMG=$DMG"
+          BEFORE="$(ls /Volumes || true)"
+          MOUNT_OUT="$(hdiutil attach -nobrowse "$DMG")"
+          echo "$MOUNT_OUT"
+          AFTER="$(ls /Volumes || true)"
+          VOL="$(comm -13 <(echo "$BEFORE" | sort) <(echo "$AFTER" | sort) | head -n1)"
+          APP_FROM_DMG="$(find "/Volumes/$VOL" -maxdepth 1 -type d -name "*.app" | head -n1)"
+          echo "Mounted at: /Volumes/$VOL"
+          echo "App: $APP_FROM_DMG"
+          BIN="$APP_FROM_DMG/Contents/MacOS/$(basename "$APP_FROM_DMG" .app)"
+          export QT_QPA_PLATFORM=offscreen
+          "$BIN" --help || true
+          "$BIN" || true
+          otool -L "$BIN" || true
+          spctl --assess --type execute --verbose "$APP_FROM_DMG" || true
+          hdiutil detach "/Volumes/$VOL" || true
