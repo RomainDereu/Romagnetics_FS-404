@@ -55,10 +55,65 @@ jobs:
           echo "path=$APP_PATH" >> $GITHUB_OUTPUT
           echo "Found: $APP_PATH"
 
+      # --- NEW: ensure offscreen platform plugin is bundled in the app BEFORE making the DMG ---
+      - name: Ensure offscreen platform plugin is present (in build tree)
+        run: |
+          set -euo pipefail
+          APP_DIR="${{ steps.locate.outputs.path }}"
+          DEST="$APP_DIR/Contents/PlugIns/platforms"
+          # Try a couple likely locations for libqoffscreen.dylib
+          CAND1="$Qt6_DIR/../plugins/platforms/libqoffscreen.dylib"
+          CAND2="$Qt6_DIR/../../../plugins/platforms/libqoffscreen.dylib"
+          PLUG=""
+          for C in "$CAND1" "$CAND2"; do
+            if [ -f "$C" ]; then PLUG="$C"; break; fi
+          done
+          if [ -z "$PLUG" ]; then
+            echo "ERROR: libqoffscreen.dylib not found near Qt6_DIR"
+            echo "Checked:"
+            echo "  $CAND1"
+            echo "  $CAND2"
+            exit 1
+          fi
+          mkdir -p "$DEST"
+          cp -fv "$PLUG" "$DEST/"
+          echo "Offscreen plugin copied to: $DEST"
+          ls -la "$DEST"
+
+      # --- NEW: quick headless smoke test from the build tree (uses offscreen) ---
+      - name: Headless smoke test (build tree)
+        run: |
+          set -euo pipefail
+          APP_PATH="${{ steps.locate.outputs.path }}"
+          EXE=$(defaults read "$APP_PATH/Contents/Info" CFBundleExecutable 2>/dev/null || basename "$APP_PATH" .app)
+          BIN="$APP_PATH/Contents/MacOS/$EXE"
+          export QT_QPA_PLATFORM=offscreen
+          export QT_DEBUG_PLUGINS=1
+          echo "Running: $BIN --help"
+          "$BIN" --help || true
+          echo "Running: $BIN"
+          "$BIN" || true
+          echo "---- Linked frameworks ----"
+          otool -L "$BIN" || true
+
       - name: Bundle (macdeployqt, no signing)
         run: |
           macdeployqt "${{ steps.locate.outputs.path }}" \
             -verbose=3 -qmldir="${{ env.APP_SUBDIR }}" -dmg
+
+      # --- NEW: verify the DMG contains platform plugins (including offscreen we copied) ---
+      - name: Verify platform plugins inside DMG
+        run: |
+          set -euo pipefail
+          DMG=$(ls -1t *.dmg build/*.dmg 2>/dev/null | head -n1)
+          echo "DMG=$DMG"
+          BEFORE="$(ls /Volumes || true)"
+          hdiutil attach -nobrowse "$DMG" >/tmp/mount.txt
+          AFTER="$(ls /Volumes || true)"
+          VOL="$(comm -13 <(echo "$BEFORE"|sort) <(echo "$AFTER"|sort) | head -n1)"
+          echo "Mounted /Volumes/$VOL"
+          ls -la "/Volumes/$VOL"/*.app/Contents/PlugIns/platforms" || true
+          hdiutil detach "/Volumes/$VOL" || true
 
       - name: Zip the .app
         run: |
