@@ -31,12 +31,12 @@ jobs:
           if command -v qt-cmake >/dev/null 2>&1; then
             qt-cmake -S "${{ env.APP_SUBDIR }}" -B build \
               -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           else
             cmake -S "${{ env.APP_SUBDIR }}" -B build \
               -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-              -DCMAKE_OSX_ARCHITECTURES=arm64 \
+              -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
               -DCMAKE_OSX_DEPLOYMENT_TARGET=12.0
           fi
 
