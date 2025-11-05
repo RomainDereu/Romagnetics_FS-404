@@ -1,205 +1,243 @@
 /*
-  Copyright 2024-2025
-  Romain Dereu
-  Released under the MIT License
+  CopRomain Dereu
+  Fixed & hardened
 */
 
 #include <EEPROM.h>
 
-// The pins for the selector switch
-const int leftSwitchPin = 3;
-const int rightSwitchPin = 2;
+// ---------------- Pin definitions (use bytes, not int)
+const uint8_t LEFT_SWITCH_PIN  = 3;
+const uint8_t RIGHT_SWITCH_PIN = 2;
+const uint8_t ONOFF_SWITCH_PIN = 5;
 
-// The main on off swich
-int onOffSwitchPin = 5;
-bool previousButtonSwitch;
+const uint8_t LED1  = 9;
+const uint8_t LED2  = 8;
+const uint8_t LED3  = 7;
+const uint8_t LED_ON = 6;
 
-// The pin for the LED
-const int ledon = 7;
+// For dev visualization (remove for production)
+const uint8_t SWITCH_LEDS[3] = { LED1, LED2, LED3 };
 
+// ---------------- Note storage (RAM)
+struct Note { uint8_t cmd, pitch, vel; };
+Note notes[3];  // notes[0], notes[1], notes[2]
 
-// The notes that will be played. Read from Eeprom
-const int cmd1 = EEPROM.read(1);
-const int pitch1 = EEPROM.read(2);
-const int velocity1 = EEPROM.read(3);
+// EEPROM address map: 1..9 (cmd1,pitch1,vel1, cmd2,pitch2,vel2, cmd3,pitch3,vel3)
+static const uint8_t kEepromBase = 1;   // 1..9 inclusive
 
-const int cmd2 = EEPROM.read(4);
-const int pitch2 = EEPROM.read(5);
-const int velocity2 = EEPROM.read(6);
+// ---------------- Debounce/edge detection
+static const uint16_t DEBOUNCE_MS = 25;
+bool lastButtonState = HIGH;   // because INPUT_PULLUP
+bool stableButtonState = HIGH;
+unsigned long lastBounceTime = 0;
 
-const int cmd3 = EEPROM.read(7);
-const int pitch3 = EEPROM.read(8);
-const int velocity3 = EEPROM.read(9);
+// ---------------- Update protocol
+// Frame: [0xFE][9 data bytes][checksum][0xFF]
+// checksum = sum of bytes 0..10 (i.e., including 0xFE header and the 9 data bytes)
+// We will read exactly 12 bytes when we detect 0xFE as the first byte.
+static const uint8_t MSG_START = 0xFE;
+static const uint8_t MSG_END   = 0xFF;
 
+// Optional status bytes back
+static const uint8_t NO_MESSAGE   = 0xFB;
+static const uint8_t MSG_ERROR    = 0xFC;
+static const uint8_t MSG_OK       = 0xFD;
 
-void setup() {
+// ---------------- Helpers
 
-  /*
-  //Leave the following part of the code uncommented if you want to reset the FS-404 to its default values
-  //Plays pads 1 to 3 in midi mode B & midi channels 1 & 2
-  int defaultNotes[] = {0x00, 0x90, 0x18, 0x80, 0x90 , 0x19, 0x80, 0x90 , 0x1a ,0x7F};
-
-  //Writing to the Eeprom
-  for(int i=1; i<11; i++){
-    EEPROM.write(i, defaultNotes[i]);
-   }
-  */
-
-  Serial.begin(31250);
-
-  // Setting of switch  and ON OFF pins
-  pinMode(leftSwitchPin, INPUT_PULLUP);
-  pinMode(rightSwitchPin, INPUT_PULLUP);
-  pinMode(onOffSwitchPin, INPUT_PULLUP);
-  // Setting of led pins
-  pinMode(ledon, OUTPUT);
-  // The power led is always on
-  digitalWrite(ledon, HIGH);
-}
-
-int switchposition() {
-  // Reading the state of both the switch and the on off button
-  int leftSwitchRead = digitalRead(leftSwitchPin);
-  int rightSwitchRead = digitalRead(rightSwitchPin);
-  if (leftSwitchRead == HIGH && rightSwitchRead == LOW) {
-    return 0;
-  } else if (leftSwitchRead == HIGH && rightSwitchRead == HIGH) {
-    return 1;
-  } else if (leftSwitchRead == LOW && rightSwitchRead == HIGH) {
-    return 2;
-  } else {
-    return;
+void loadNotesFromEEPROM() {
+  for (uint8_t i = 0; i < 3; ++i) {
+    notes[i].cmd   = EEPROM.read(kEepromBase + (i * 3) + 0);
+    notes[i].pitch = EEPROM.read(kEepromBase + (i * 3) + 1);
+    notes[i].vel   = EEPROM.read(kEepromBase + (i * 3) + 2);
   }
 }
 
-// Plays a MIDI note once
-void noteOn(int cmd, int pitch, int velocity) {
-  Serial.write(cmd);
-  Serial.write(pitch);
-  Serial.write(velocity);
-  return;
-}
-
-
-// Checks the type of the note
-// Sends note off if the message is a note
-void noteOff(int cmd, int pitch, int velocity) {
-
-  if(cmd > 0x8a && cmd < 0xA0){
-    int noteOffCmd = cmd - 0x10;
-    Serial.write(noteOffCmd);
-    Serial.write(pitch);
-    Serial.write(velocity);
+void saveNotesToEEPROM(const uint8_t* data9) {
+  // data9 layout: [cmd1,pitch1,vel1, cmd2,pitch2,vel2, cmd3,pitch3,vel3]
+  for (uint8_t i = 0; i < 9; ++i) {
+    EEPROM.write(kEepromBase + i, data9[i]);
   }
-  return;
 }
 
-// Plays a MIDI note and then sends a corresponding note off 100ms later
-void sendnote(int cmd, int pitch, int velocity) {
+// Reads an exact 12-byte frame. Returns true if a valid frame was parsed into data9[9].
+bool readUpdateFrame(uint8_t* data9) {
+  // Look for start byte
+  int b = Serial.read();
+  if (b < 0) { return false; }
+  if ((uint8_t)b != MSG_START) { 
+    // Not a framed update; flush minimal and report
+    Serial.write(NO_MESSAGE);
+    return false; 
+  }
+
+  uint8_t buffer[12];
+  buffer[0] = MSG_START;
+
+  // Read the remaining 11 bytes with a timeout
+  const unsigned long start = millis();
+  uint8_t idx = 1;
+  while (idx < 12 && (millis() - start) < 50) { // 50ms guard
+    if (Serial.available()) {
+      buffer[idx++] = (uint8_t)Serial.read();
+    }
+  }
+  if (idx < 12) {
+    Serial.write(MSG_ERROR);
+    return false; // timed out / short read
+  }
+
+  // Validate end byte
+  if (buffer[11] != MSG_END) {
+    Serial.write(MSG_ERROR);
+    return false;
+  }
+
+  // Compute checksum over buffer[0..10]
+  uint8_t csum = 0;
+  for (uint8_t i = 0; i <= 10; ++i) csum += buffer[i];
+
+  if (csum != buffer[10]) {
+    // Send back computed checksum for debugging, then error
+    Serial.write(csum);
+    Serial.write(MSG_ERROR);
+    return false;
+  }
+
+  // Extract the 9 data bytes (buffer[1..9])
+  for (uint8_t i = 0; i < 9; ++i) data9[i] = buffer[1 + i];
+
+  Serial.write(MSG_OK);
+  return true;
+}
+
+int readSwitchPosition() {
+  // Using INPUT_PULLUP: LOW = pressed/connected to GND
+  const uint8_t l = digitalRead(LEFT_SWITCH_PIN);
+  const uint8_t r = digitalRead(RIGHT_SWITCH_PIN);
+
+  if (l == HIGH && r == LOW)  return 0;
+  if (l == HIGH && r == HIGH) return 1;
+  if (l == LOW  && r == HIGH) return 2;
+  return -1; // invalid or mid-transition
+}
+
+// Dev LED helper (no-op safe when index invalid)
+void updateSwitchLeds(int pos) {
+  for (uint8_t i = 0; i < 3; ++i) {
+    digitalWrite(SWITCH_LEDS[i], (i == pos) ? HIGH : LOW);
+  }
+}
+
+// MIDI
+inline void midiWrite3(uint8_t a, uint8_t b, uint8_t c) {
+  Serial.write(a); Serial.write(b); Serial.write(c);
+}
+
+void noteOn(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
+  midiWrite3(cmd, pitch, velocity);
+}
+
+void noteOff(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
+  // If cmd is Note On (0x90..0x9F), map to Note Off (0x80..0x8F)
+  if (cmd >= 0x90 && cmd <= 0x9F) {
+    uint8_t off = cmd - 0x10;
+    midiWrite3(off, pitch, velocity);
+  }
+}
+
+void sendNote(uint8_t cmd, uint8_t pitch, uint8_t velocity) {
   noteOn(cmd, pitch, velocity);
   delay(100);
   noteOff(cmd, pitch, velocity);
-  return;
 }
 
-// Choosing which note will be played
-void sendmidi(int toggleSwitchPosition) {
-  if (toggleSwitchPosition == 0) {
-    sendnote(cmd1, pitch1, velocity1);
-  } else if (toggleSwitchPosition == 1) {
-    sendnote(cmd2, pitch2, velocity2);
-  } else if (toggleSwitchPosition == 2) {
-    sendnote(cmd3, pitch3, velocity3);
-  }
-  return;
+void sendMidiFor(int pos) {
+  if (pos < 0 || pos > 2) return;
+  sendNote(notes[pos].cmd, notes[pos].pitch, notes[pos].vel);
 }
 
-//Limits the button presses to non consecutive button presses
-bool debounce(bool previousButtonSwitch) {
-  if (previousButtonSwitch == LOW) {
-    return 0;
+// Returns true exactly once per valid press (falling edge w/ debounce)
+bool buttonPressedEdge() {
+  bool reading = (digitalRead(ONOFF_SWITCH_PIN) == LOW); // active LOW
+  unsigned long now = millis();
+
+  if (reading != lastButtonState) {
+    lastBounceTime = now;
+    lastButtonState = reading;
   }
 
-  else {
-    delay(5);
-    bool currentState = digitalRead(onOffSwitchPin);
-    if (currentState == LOW) {
-      return 1;
-    } else {
-      return 0;
+  if ((now - lastBounceTime) > DEBOUNCE_MS) {
+    if (reading != stableButtonState) {
+      stableButtonState = reading;
+      if (stableButtonState == true) {
+        // transitioned to pressed (LOW)
+        return true;
+      }
     }
   }
+  return false;
 }
 
-//Updates the notes to the Unit
-void notesupdate() {
-  /* Message format:
-    Header       (1 byte)           - Header Byte (value 0xfe)
-    Data         (9 bytes)          - Info for the three notes
-    Checksum     (1 byte)           - Message integrity check
-    Message end  (1 byte)           - Signaling the end of the message (value 0xff)
-    Total message size = 12 bythes
-*/
+// ---------------- Arduino lifecycle
 
-  byte buffer[12];
-  Serial.readBytesUntil(0xff, buffer, 12);
-  delay(100);
-  //Checksum of the message
-  bool checksumResult = messagecheck(buffer);
+void setup() {
+  // Uncomment to reset to sane defaults ONCE, then recompile with it commented out
+  /*
+  // Defaults: play pads 1..3 on MIDI ch1 Note 0x18, 0x19, 0x1A with vel 0x7F
+  const uint8_t defaultData[9] = {
+    0x90, 0x18, 0x7F,
+    0x90, 0x19, 0x7F,
+    0x90, 0x1A, 0x7F
+  };
+  saveNotesToEEPROM(defaultData);
+  */
 
-  if (checksumResult == 1) {
-    //Writing to the Eeprom
-    for (int i = 1; i < 11; i++) { EEPROM.write(i, buffer[i]); }
-  }
+  Serial.begin(31250); // MIDI baud
 
-  else {
-    return;
-  }
-}
+  pinMode(LEFT_SWITCH_PIN,  INPUT_PULLUP);
+  pinMode(RIGHT_SWITCH_PIN, INPUT_PULLUP);
+  pinMode(ONOFF_SWITCH_PIN, INPUT_PULLUP);
 
-//Checks if the received message is good
-bool messagecheck(byte *buffer) {
+  pinMode(LED_ON, OUTPUT);
+  digitalWrite(LED_ON, HIGH);
 
-  //list of error messages
-  //Reduced to one char to be sent as a single bit
-  const byte noMessageReceived = 0xfb;  // 251
-  const byte messageError = 0xfc;       // 252
-  const byte allreceived = 0xfd;        // 253
-  const byte messageStart = 0xfe;       // 254
+  // Dev LEDs
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
 
-  //Checking if data was sent at all using the first bit (should be 0xff)
-  if (buffer[0] != messageStart) {
-    Serial.write(noMessageReceived);
-    return 0;
-  }
+  // Initialize states
+  lastButtonState   = digitalRead(ONOFF_SWITCH_PIN);
+  stableButtonState = lastButtonState;
 
-  byte checksum = 0;
-  for (int x = 0; x < 10; x++) { checksum += buffer[x]; }
-
-  //Checking the value of the checksum against the last received value
-  if (checksum != buffer[10]) {
-    Serial.write(checksum);
-    Serial.write(messageError);
-    return 0;
-  }
-
-  else {
-    Serial.write(allreceived);
-    return 1;
-  }
+  // Load runtime notes
+  loadNotesFromEEPROM();
 }
 
 void loop() {
-  //Checks whether Serial is connected. If this is the case, the pedal will be in update mode
-  if (Serial.available()) { notesupdate(); }
-
-  // Checking the toggle and on off switches
-  int toggleSwitchPosition = switchposition();
-  bool currentSwitchPosition = digitalRead(onOffSwitchPin);
-
-  if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)) {
-    sendmidi(toggleSwitchPosition);
+  // --- Update mode: only act if a framed message begins with 0xFE
+  if (Serial.available()) {
+    // Peek the first byte to decide if it's an update frame
+    int peeked = Serial.peek();
+    if (peeked == MSG_START) {
+      uint8_t data9[9];
+      if (readUpdateFrame(data9)) {
+        saveNotesToEEPROM(data9);
+        loadNotesFromEEPROM(); // refresh RAM so changes are live immediately
+      } else {
+        // If bad frame, try to recover by flushing a little
+        while (Serial.available()) { Serial.read(); if (Serial.peek() == -1) break; }
+      }
+    }
+    // else: ignore normal MIDI or stray bytes
   }
-  //Saving the button position to avoid double triggers
-  previousButtonSwitch = digitalRead(onOffSwitchPin);
+
+  // --- UI & trigger
+  int pos = readSwitchPosition();
+  if (pos >= 0) { updateSwitchLeds(pos); }   // dev only
+
+  if (buttonPressedEdge()) {
+    if (pos >= 0) { sendMidiFor(pos); }
+  }
 }
