@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Widget</string>
+   <string>Romagnetics FS-404</string>
   </property>
   <widget class="Line" name="upper_line">
    <property name="geometry">
