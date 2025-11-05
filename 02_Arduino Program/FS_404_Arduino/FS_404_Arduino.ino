@@ -10,7 +10,7 @@ const int rightSwitchPin = 2;
 
 // The main on off swich
 int  onOffSwitchPin = 5;
-bool previousButtonSwitch = digitalRead(onOffSwitchPin);
+bool previousButtonSwitch;
 
 // The pins for the led
 const int led1  = 9;
@@ -53,6 +53,8 @@ void setup() {
   pinMode(leftSwitchPin, INPUT_PULLUP);
   pinMode(rightSwitchPin, INPUT_PULLUP);
   pinMode(onOffSwitchPin, INPUT_PULLUP);
+
+  previousButtonSwitch = digitalRead(onOffSwitchPin);
 
   // Setting of led pins
   pinMode(ledon, OUTPUT);
@@ -160,19 +162,19 @@ void notesupdate() {
   */
 
   byte buffer[12];
-  Serial.readBytesUntil(0xff, buffer, 12);
-  delay(100);
+  Serial.setTimeout(1000);             
+  int n = Serial.readBytes(buffer, 12);  
+  if (n != 12) return;                   
+
+  if (buffer[11] != 0xFF) return;   
 
   // Checksum of the message
-  bool checksumResult = messagecheck(buffer);
+  bool ok = messagecheck(buffer);
+  if (!ok) return;
 
-  if (checksumResult == 1) {
-    // Writing to the Eeprom
-    for (int i = 1; i < 10; i++) {
-      EEPROM.write(i, buffer[i]);
-    }
-  } else {
-    return;
+  // Write only data bytes 1..9 (not the checksum/end)
+  for (int i = 1; i <= 9; i++) {
+    EEPROM.write(i, buffer[i]);
   }
 }
 
