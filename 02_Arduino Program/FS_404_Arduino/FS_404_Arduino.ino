@@ -1,5 +1,5 @@
 /*
-  CopRomain Dereu
+  Copyright 2024-2025 Romain Dereu
 */
 
 #include <EEPROM.h>
@@ -10,7 +10,7 @@ const int rightSwitchPin = 2;
 
 // The main on off swich
 int  onOffSwitchPin = 5;
-bool previousButtonSwitch;
+bool previousButtonSwitch = digitalRead(onOffSwitchPin);
 
 // The pins for the led
 const int led1  = 9;
@@ -19,7 +19,6 @@ const int led3  = 7;
 const int ledon = 6;
 
 // Switch leds are the three that change according to the switch
-// Romain delete for production
 const int switchLedNumbers[] = { led1, led2, led3 };
 
 // The notes that will be played. Read from Eeprom
@@ -57,8 +56,6 @@ void setup() {
 
   // Setting of led pins
   pinMode(ledon, OUTPUT);
-
-  // Romain delete production
   pinMode(led1, OUTPUT);
   pinMode(led2, OUTPUT);
   pinMode(led3, OUTPUT);
@@ -79,11 +76,10 @@ int switchposition() {
   } else if (leftSwitchRead == LOW && rightSwitchRead == HIGH) {
     return 2;
   } else {
-    return;
+    return -1;
   }
 }
 
-// Romain delete for production
 void updatelight(int toggleSwitchPosition) {
   for (int i = 0; i < 3; i++) {
     if (i == toggleSwitchPosition) {
@@ -109,7 +105,7 @@ void noteOff(int cmd, int pitch, int velocity) {
 
   // Note off is triggered under the following condition
   // A note on has been sent (not applicable to note off)
-  if (cmd > 0x8a && cmd < 0xA0) {
+  if (cmd >= 0x90 && cmd <= 0x9F) {
     int noteOffCmd = cmd - 0x10;
     Serial.write(noteOffCmd);
     Serial.write(pitch);
@@ -172,7 +168,7 @@ void notesupdate() {
 
   if (checksumResult == 1) {
     // Writing to the Eeprom
-    for (int i = 1; i < 11; i++) {
+    for (int i = 1; i < 10; i++) {
       EEPROM.write(i, buffer[i]);
     }
   } else {
@@ -223,11 +219,14 @@ void loop() {
   bool currentSwitchPosition = digitalRead(onOffSwitchPin);
 
   // updating the light value and sending midi if the note is on
-  // Romain delete for production
-  updatelight(toggleSwitchPosition);
+  if (toggleSwitchPosition >= 0) {
+    updatelight(toggleSwitchPosition);
+  }
 
   if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)) {
-    sendmidi(toggleSwitchPosition);
+    if (toggleSwitchPosition >= 0) {
+      sendmidi(toggleSwitchPosition);
+    }
   }
 
   // Saving the button position to avoid double triggers
