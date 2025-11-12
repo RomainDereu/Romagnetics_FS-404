@@ -13,18 +13,26 @@ int  onOffSwitchPin = 5;
 bool previousButtonSwitch;
 
 // The pins for the led
-const int led1  = 9;
-const int led2  = 8;
-const int led3  = 7;
-const int ledon = 6;
+const int LED1  = 9;
+const int LED2  = 8;
+const int LED3  = 7;
+const int LEDON = 6;
 
 const byte DATA_BYTES = 16;              // bytes 1..16
 const byte MSG_LEN    = 1 + DATA_BYTES + 1 + 1; // header + data + checksum + end = 19
 const byte HEADER_BYTE = 0xFE;
 const byte END_BYTE    = 0xFF;
 
+enum : byte { PLAY_NOTE = 0, 
+              NEXT_NOTE, 
+              PREVIOUS_NOTE, 
+              RESET_NOTE,
+              KILL_ALL};
+
+
+
 // Switch leds are the three that change according to the switch
-const int switchLedNumbers[] = { led1, led2, led3 };
+const int switchLedNumbers[] = { LED1, LED2, LED3 };
 
 struct Note {
   byte type;
@@ -34,6 +42,7 @@ struct Note {
 };
 Note notes[4];
 
+Note lastNote;
 
 
 void setup() {
@@ -62,7 +71,8 @@ void setup() {
     notes[i].velocity = EEPROM.read(4 + i * 4);
   }
 
-  
+  lastNote = notes[0];
+
 
   Serial.begin(31250);
 
@@ -74,13 +84,13 @@ void setup() {
   previousButtonSwitch = digitalRead(onOffSwitchPin);
 
   // Setting of led pins
-  pinMode(ledon, OUTPUT);
-  pinMode(led1, OUTPUT);
-  pinMode(led2, OUTPUT);
-  pinMode(led3, OUTPUT);
+  pinMode(LEDON, OUTPUT);
+  pinMode(LED1, OUTPUT);
+  pinMode(LED2, OUTPUT);
+  pinMode(LED3, OUTPUT);
 
   // The power led is always on
-  digitalWrite(ledon, HIGH);
+  digitalWrite(LEDON, HIGH);
 }
 
 int switchposition() {
@@ -111,36 +121,71 @@ void updatelight(int toggleSwitchPosition) {
 }
 
 // Plays a MIDI note once
-void noteOn(byte cmd, byte pitch, byte velocity) {
-  Serial.write(cmd);
-  Serial.write(pitch);
-  Serial.write(velocity);
+void noteOn(const Note &note) {
+  Serial.write(note.cmd);
+  Serial.write(note.pitch);
+  Serial.write(note.velocity);
   return;
 }
 
 // Checks the type of the note
 // Sends note off if the message is a note
-void noteOff(byte cmd,byte pitch,byte velocity) {
-
-  // Note off is triggered under the following condition
-  // A note on has been sent (not applicable to note off)
-  if (cmd >= 0x90 && cmd <= 0x9F) {
-    byte noteOffCmd = cmd - 0x10;
+void noteOff(const Note &note) {
+  // Only generate Note Off when the status was Note On (0x90..0x9F)
+  if (note.cmd >= 0x90 && note.cmd <= 0x9F) {
+    byte noteOffCmd = note.cmd - 0x10; // becomes 0x8n
     Serial.write(noteOffCmd);
-    Serial.write(pitch);
-    Serial.write(velocity);
+    Serial.write(note.pitch);
+    Serial.write(0);
   }
-  return;
 }
 
-// Plays a MIDI note and then sends a corresponding note off 100ms later
-void sendnote(const Note &n) {
-  if (n.type == 0) {
-    noteOn(n.cmd, n.pitch, n.velocity);
-    delay(100);
-    noteOff(n.cmd, n.pitch, n.velocity);
+void noteOnOff(const Note &note) {
+  noteOn(note);
+  delay(100);
+  noteOff(note);
+}
+
+void killAllNotes() {
+  for (byte ch = 0; ch < 16; ch++) {
+    Serial.write(0xB0 | ch); Serial.write(64);  Serial.write(0);  // Sustain Off
+    Serial.write(0xB0 | ch); Serial.write(120); Serial.write(0);  // All Sound Off
+    Serial.write(0xB0 | ch); Serial.write(123); Serial.write(0);  // All Notes Off
   }
-  return;
+}
+
+
+void sendnote(Note note) { 
+  auto clampPitch = [](int v) -> byte {
+    if (v < 0)   return 0;
+    if (v > 127) return 127;
+    return (byte)v;
+  };
+
+  if (note.type == PLAY_NOTE) {
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == NEXT_NOTE) {
+    note = lastNote;
+    note.pitch = clampPitch(note.pitch + 1);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == PREVIOUS_NOTE) {
+    note = lastNote;
+    note.pitch = clampPitch(note.pitch - 1);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == RESET_NOTE) {
+    note = notes[0];
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == KILL_ALL) {
+  killAllNotes();
+}
 }
 
 
