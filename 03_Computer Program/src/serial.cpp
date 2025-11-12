@@ -126,75 +126,86 @@ void Widget::on_disconnect_button_clicked()
     }
 }
 
-void Widget::fs404notesmessage(){
+void Widget::fs404notesmessage() {
 
-        ui->logPlainTextEdit->appendPlainText("Starting data transfer");
+    ui->logPlainTextEdit->appendPlainText("Starting data transfer");
 
-        /* Message format:
-        Header       (1 byte)           - Header Byte (value 0xfe)
-        Data         (9 bytes)          - Info for the three notes
-        Checksum     (1 byte)           - Message integrity check
-        Message end  (1 byte)           - Signaling the end of the message (value 0xff)
-        Total message size = 12 bythes
-        */
+    // Message format (4 notes × 4 fields):
+    // [0]  Header       : 0xFE
+    // [1..16] Data      : t1 c1 p1 v1  t2 c2 p2 v2  t3 c3 p3 v3  t4 c4 p4 v4
+    // [17] Checksum     : sum of bytes [0..16] (uint8_t wrap)
+    // [18] End          : 0xFF
+    // Total: 19 bytes
 
-        //list of error messages
-        //Reduced to one char to be sent as a single bit
-        const unsigned char noMessageReceived = 0xfb; // 251
-        const unsigned char messageError = 0xfc; // 252
-        const unsigned char allreceived = 0xfd; // 253
-        const unsigned char messageStart = 0xfe; // 254
-        const unsigned char messageEnd = 0xff; // 254
-        unsigned char checksum = 0; // initializing at 0
+    // Status / markers
+    const unsigned char noMessageReceived = 0xFB;
+    const unsigned char messageError      = 0xFC;
+    const unsigned char allreceived       = 0xFD;
+    const unsigned char messageStart      = 0xFE;
+    const unsigned char messageEnd        = 0xFF;
 
-        //creating the objects for the notes
-        std::array<unsigned char, 3> noteInfo1Hex = ui->note1->sendNoteInfo().returnmessage();
-        std::array<unsigned char, 3> noteInfo2Hex = ui->note2->sendNoteInfo().returnmessage();
-        std::array<unsigned char, 3> noteInfo3Hex = ui->note3->sendNoteInfo().returnmessage();
+    // Gather 3-byte MIDI payloads from the existing UI (unchanged)
+    std::array<unsigned char, 3> n1 = ui->note1->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 3> n2 = ui->note2->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 3> n3 = ui->note3->sendNoteInfo().returnmessage();
 
+    // Build the 19-byte message
+    unsigned char msg[19];
+    msg[0] = messageStart;
 
-        //Passing the return to the message raw array
-        unsigned char messageraw[12];
-        messageraw[0] = messageStart;
-        //Pasting the info of the three notes
-        std::copy(std::begin(noteInfo1Hex), std::end(noteInfo1Hex), messageraw + 1);
-        std::copy(std::begin(noteInfo2Hex), std::end(noteInfo2Hex), messageraw + 4);
-        std::copy(std::begin(noteInfo3Hex), std::end(noteInfo3Hex), messageraw + 7);
-        //Calculating the Checksum
-        for(int x=0; x<10;x++){checksum += messageraw[x];}
-        messageraw[10] = checksum;
-        messageraw[11] = messageEnd;
+    // Note 0 (reserved/empty for now): type=0, cmd=0, pitch=0, vel=0
+    msg[1] = 0x00; msg[2] = 0x00; msg[3] = 0x00; msg[4] = 0x00;
 
-        //Converting the unsigned char array into an char array
-        char messagechar[12];
-        for (size_t i = 0; i < 12; i++)
-            messagechar[i] = static_cast<unsigned char>(messageraw[i]);
-        QByteArray messageQByte =  QByteArray::fromRawData(messagechar, sizeof(messagechar));;
-        QString  messagePlainText = QString(messageQByte.toHex(' '));
+    // Note 1 = type(0) + UI note1
+    msg[5]  = 0x00;       // type
+    msg[6]  = n1[0];      // cmd/status
+    msg[7]  = n1[1];      // pitch/data1
+    msg[8]  = n1[2];      // velocity/data2
 
-        bool transferwassuccessful = 0;
-        int attempts = 0;
-        //Making up to 10 loops if transfers aren't successful
-        for (int x=0; x<10 && transferwassuccessful ==0 ; x++) {
-            serialWrite(messageQByte);
-            //trying to send the message 10 times.
-            //Sending an error message if the transfer doesn't work
-            transferwassuccessful = serialRead();            
-            delay();
-            attempts ++;
-        }
+    // Note 2 = type(0) + UI note2
+    msg[9]  = 0x00;
+    msg[10] = n2[0];
+    msg[11] = n2[1];
+    msg[12] = n2[2];
 
-        if (transferwassuccessful == 1){
-            ui->logPlainTextEdit->appendPlainText("The following message was sucessfuly sent");
-            ui->logPlainTextEdit->appendPlainText(messagePlainText);
-            }
-        else  {
-            ui->logPlainTextEdit->appendPlainText("The message couldn't be saved. Please try again");
-            ui->logPlainTextEdit->appendPlainText(messagePlainText);
+    // Note 3 = type(0) + UI note3
+    msg[13] = 0x00;
+    msg[14] = n3[0];
+    msg[15] = n3[1];
+    msg[16] = n3[2];
 
-                }
+    // Checksum over [0..16]
+    unsigned char checksum = 0;
+    for (int i = 0; i <= 16; ++i) checksum += msg[i];
+    msg[17] = checksum;
 
-        }
+    // End byte
+    msg[18] = messageEnd;
+
+    // Ship it
+    char messagechar[19];
+    for (size_t i = 0; i < 19; ++i) messagechar[i] = static_cast<char>(msg[i]);
+    QByteArray messageQByte = QByteArray::fromRawData(messagechar, sizeof(messagechar));
+    QString messagePlainText = QString(messageQByte.toHex(' '));
+
+    bool transferOk = false;
+    int attempts = 0;
+    for (int tries = 0; tries < 10 && !transferOk; ++tries) {
+        serialWrite(messageQByte);
+        transferOk = serialRead();
+        delay();
+        ++attempts;
+    }
+
+    if (transferOk) {
+        ui->logPlainTextEdit->appendPlainText("The following message was successfully sent");
+        ui->logPlainTextEdit->appendPlainText(messagePlainText);
+    } else {
+        ui->logPlainTextEdit->appendPlainText("The message couldn't be saved. Please try again");
+        ui->logPlainTextEdit->appendPlainText(messagePlainText);
+    }
+}
+
 
 
 
