@@ -18,34 +18,51 @@ const int led2  = 8;
 const int led3  = 7;
 const int ledon = 6;
 
+const byte DATA_BYTES = 16;              // bytes 1..16
+const byte MSG_LEN    = 1 + DATA_BYTES + 1 + 1; // header + data + checksum + end = 19
+const byte HEADER_BYTE = 0xFE;
+const byte END_BYTE    = 0xFF;
+
 // Switch leds are the three that change according to the switch
 const int switchLedNumbers[] = { led1, led2, led3 };
 
-// The notes that will be played. Read from Eeprom
-const int cmd1      = EEPROM.read(1);
-const int pitch1    = EEPROM.read(2);
-const int velocity1 = EEPROM.read(3);
+struct Note {
+  byte type;
+  byte cmd;
+  byte pitch;
+  byte velocity;
+};
+Note notes[4];
 
-const int cmd2      = EEPROM.read(4);
-const int pitch2    = EEPROM.read(5);
-const int velocity2 = EEPROM.read(6);
 
-const int cmd3      = EEPROM.read(7);
-const int pitch3    = EEPROM.read(8);
-const int velocity3 = EEPROM.read(9);
 
 void setup() {
+
 
   /*
   // Leave the following part of the code uncommented if you want to reset the FS-404 to its default values
   // Plays pads 1 to 3 in midi mode B & midi channels 1 & 2
-  int defaultNotes[] = {0x00, 0x90, 0x18, 0x80, 0x90, 0x19, 0x80, 0x90, 0x1a, 0x7F};
+    const byte defaultNotes[DATA_BYTES] = {
+      0x00, 0x90, 0x30, 0x7F,  // note 0 (base note)
+      0x00, 0x90, 0x30, 0x7F,  // note 1
+      0x00, 0x90, 0x31, 0x7F,  // note 2
+      0x00, 0x90, 0x32, 0x7F   // note 3
+    };
 
-  // Writing to the Eeprom
-  for (int i = 1; i < 11; i++) {
-    EEPROM.write(i, defaultNotes[i]);
-  }
+    for (int i = 0; i < DATA_BYTES; i++) {
+      EEPROM.write(1 + i, defaultNotes[i]);
+    }
   */
+
+    // The notes that will be played. Read from Eeprom
+  for (int i = 0; i < 4; i++) {
+    notes[i].type     = EEPROM.read(1 + i * 4);
+    notes[i].cmd      = EEPROM.read(2 + i * 4);
+    notes[i].pitch    = EEPROM.read(3 + i * 4);
+    notes[i].velocity = EEPROM.read(4 + i * 4);
+  }
+
+  
 
   Serial.begin(31250);
 
@@ -94,7 +111,7 @@ void updatelight(int toggleSwitchPosition) {
 }
 
 // Plays a MIDI note once
-void noteOn(int cmd, int pitch, int velocity) {
+void noteOn(byte cmd, byte pitch, byte velocity) {
   Serial.write(cmd);
   Serial.write(pitch);
   Serial.write(velocity);
@@ -103,12 +120,12 @@ void noteOn(int cmd, int pitch, int velocity) {
 
 // Checks the type of the note
 // Sends note off if the message is a note
-void noteOff(int cmd, int pitch, int velocity) {
+void noteOff(byte cmd,byte pitch,byte velocity) {
 
   // Note off is triggered under the following condition
   // A note on has been sent (not applicable to note off)
   if (cmd >= 0x90 && cmd <= 0x9F) {
-    int noteOffCmd = cmd - 0x10;
+    byte noteOffCmd = cmd - 0x10;
     Serial.write(noteOffCmd);
     Serial.write(pitch);
     Serial.write(velocity);
@@ -117,21 +134,20 @@ void noteOff(int cmd, int pitch, int velocity) {
 }
 
 // Plays a MIDI note and then sends a corresponding note off 100ms later
-void sendnote(int cmd, int pitch, int velocity) {
-  noteOn(cmd, pitch, velocity);
-  delay(100);
-  noteOff(cmd, pitch, velocity);
+void sendnote(const Note &n) {
+  if (n.type == 0) {
+    noteOn(n.cmd, n.pitch, n.velocity);
+    delay(100);
+    noteOff(n.cmd, n.pitch, n.velocity);
+  }
   return;
 }
 
+
 // Choosing which note will be played
 void sendmidi(int toggleSwitchPosition) {
-  if (toggleSwitchPosition == 0) {
-    sendnote(cmd1, pitch1, velocity1);
-  } else if (toggleSwitchPosition == 1) {
-    sendnote(cmd2, pitch2, velocity2);
-  } else if (toggleSwitchPosition == 2) {
-    sendnote(cmd3, pitch3, velocity3);
+  if (toggleSwitchPosition >= 0 && toggleSwitchPosition < 3) {
+    sendnote(notes[toggleSwitchPosition + 1]);
   }
   return;
 }
@@ -153,54 +169,61 @@ bool debounce(bool previousButtonSwitch) {
 
 // Updates the notes to the Unit
 void notesupdate() {
-  /* Message format:
-    Header       (1 byte)           - Header Byte (value 0xfe)
-    Data         (9 bytes)          - Info for the three notes
-    Checksum     (1 byte)           - Message integrity check
-    Message end  (1 byte)           - Signaling the end of the message (value 0xff)
-    Total message size = 12 bythes
+  /* Message format (4 notes × 4 fields):
+     [0] Header       : 0xFE
+     [1..16] Data     : t1 c1 p1 v1 t2 c2 p2 v2 t3 c3 p3 v3 t4 c4 p4 v4
+     [17] Checksum    : sum of bytes [0..16] modulo 256
+     [18] End         : 0xFF
+     Total size = 19 bytes
   */
 
-  byte buffer[12];
-  Serial.setTimeout(1000);             
-  int n = Serial.readBytes(buffer, 12);  
-  if (n != 12) return;                   
+  byte buffer[MSG_LEN];
+  Serial.setTimeout(1000);
+  int n = Serial.readBytes(buffer, MSG_LEN);
+  if (n != MSG_LEN) return;
 
-  if (buffer[11] != 0xFF) return;   
+  if (buffer[MSG_LEN - 1] != END_BYTE) return; // verify end byte first
 
-  // Checksum of the message
+  // Checksum & header validation
   bool ok = messagecheck(buffer);
   if (!ok) return;
 
-  // Write only data bytes 1..9 (not the checksum/end)
-  for (int i = 1; i <= 9; i++) {
+  // Persist data bytes [1..16] to EEPROM addresses [1..16]
+  for (int i = 1; i <= DATA_BYTES; i++) {
     EEPROM.write(i, buffer[i]);
+  }
+
+  // Refresh in-RAM notes immediately
+  for (int i = 0; i < 4; i++) {
+    int base = 1 + i * 4;
+    notes[i].type     = EEPROM.read(base + 0);
+    notes[i].cmd      = EEPROM.read(base + 1);
+    notes[i].pitch    = EEPROM.read(base + 2);
+    notes[i].velocity = EEPROM.read(base + 3);
   }
 }
 
 // Checks if the received message is good
-bool messagecheck(byte *buffer) {
+bool messagecheck(const byte *buffer) {
+  // status bytes
+  const byte noMessageReceived = 0xFB;
+  const byte messageError      = 0xFC;
+  const byte allreceived       = 0xFD;
 
-  // list of error messages
-  // Reduced to one char to be sent as a single bit
-  const byte noMessageReceived = 0xfb;  // 251
-  const byte messageError      = 0xfc;  // 252
-  const byte allreceived       = 0xfd;  // 253
-  const byte messageStart      = 0xfe;  // 254
-
-  // Checking if data was sent at all using the first bit (should be 0xff)
-  if (buffer[0] != messageStart) {
+  // Check header
+  if (buffer[0] != HEADER_BYTE) {
     Serial.write(noMessageReceived);
     return 0;
   }
 
-  byte checksum = 0;
-  for (int x = 0; x < 10; x++) {
+  // Compute checksum over bytes [0..16] (header + 16 data bytes)
+  uint8_t checksum = 0;
+  for (int x = 0; x <= DATA_BYTES; x++) { // 0..16 inclusive
     checksum += buffer[x];
   }
 
-  // Checking the value of the checksum against the last received value
-  if (checksum != buffer[10]) {
+  // Compare against checksum at index 17
+  if (checksum != buffer[1 + DATA_BYTES]) {
     Serial.write(checksum);
     Serial.write(messageError);
     return 0;
@@ -212,8 +235,7 @@ bool messagecheck(byte *buffer) {
 
 void loop() {
   // Checks whether Serial is connected. If this is the case, the pedal will be in update mode
-  if (Serial.available()) {
-    notesupdate();
+if (Serial.available() && Serial.peek() == 0xFE) {    notesupdate();
   }
 
   // Checking the toggle and on off switches
