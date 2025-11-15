@@ -51,14 +51,31 @@ void Note_interface::on_note_list_mode_combo_currentTextChanged(const QString &a
         return;
     }
 
+    //case Previous Next
+    else if (currentmode == "Previous Next"){
+        note_ui->note_stackedWidget->setCurrentWidget(note_ui->note_5previousnext);
+        return;
+    }
+
     else{qDebug()<< "UI error: No midi note mode selected";}
 
+}
+
+void Note_interface::setIsBaseNote(bool isBase)
+{
+    if (isBase) {
+        // Remove "Previous Next" from the combo
+        int index = note_ui->note_list_mode_combo->findText("Previous Next");
+        if (index != -1) {
+            note_ui->note_list_mode_combo->removeItem(index);
+        }
+    }
 }
 
 void Note_interface::setup_noteui()
 {
 
-    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC" };
+    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC", "Previous Next"};
 
     //Populating the upload modes
     for (int x = 0; x < list_modes.size(); x++){

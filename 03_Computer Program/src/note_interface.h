@@ -26,6 +26,8 @@ public:
     //updating the note combo. Used during setup:
     void update_note_value(int combo_index);
 
+    void setIsBaseNote(bool isBase);
+
 private slots:
     void on_note_list_mode_combo_currentTextChanged(const QString &arg1);
 

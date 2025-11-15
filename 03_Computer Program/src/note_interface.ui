@@ -16,7 +16,7 @@
   <widget class="QComboBox" name="note_list_mode_combo">
    <property name="geometry">
     <rect>
-     <x>70</x>
+     <x>110</x>
      <y>10</y>
      <width>131</width>
      <height>21</height>
@@ -28,7 +28,7 @@
     <rect>
      <x>10</x>
      <y>4</y>
-     <width>41</width>
+     <width>81</width>
      <height>41</height>
     </rect>
    </property>
@@ -47,14 +47,14 @@
   <widget class="QStackedWidget" name="note_stackedWidget">
    <property name="geometry">
     <rect>
-     <x>210</x>
+     <x>250</x>
      <y>0</y>
      <width>721</width>
      <height>41</height>
     </rect>
    </property>
    <property name="currentIndex">
-    <number>2</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="note_3notes">
     <widget class="QLabel" name="note_velocity_label">
@@ -149,7 +149,7 @@
     <widget class="QLabel" name="note_cc_number_label">
      <property name="geometry">
       <rect>
-       <x>170</x>
+       <x>190</x>
        <y>10</y>
        <width>81</width>
        <height>16</height>
@@ -162,9 +162,9 @@
     <widget class="QLabel" name="note_cc_value_label">
      <property name="geometry">
       <rect>
-       <x>330</x>
+       <x>360</x>
        <y>10</y>
-       <width>111</width>
+       <width>61</width>
        <height>16</height>
       </rect>
      </property>
@@ -175,7 +175,7 @@
     <widget class="QSpinBox" name="note_cc_number_spin">
      <property name="geometry">
       <rect>
-       <x>250</x>
+       <x>280</x>
        <y>10</y>
        <width>71</width>
        <height>25</height>
@@ -191,7 +191,7 @@
     <widget class="QSpinBox" name="note_cc_value_spin">
      <property name="geometry">
       <rect>
-       <x>390</x>
+       <x>440</x>
        <y>10</y>
        <width>71</width>
        <height>25</height>
@@ -207,9 +207,9 @@
     <widget class="QLabel" name="note_cc_midi_label">
      <property name="geometry">
       <rect>
-       <x>0</x>
+       <x>20</x>
        <y>10</y>
-       <width>91</width>
+       <width>81</width>
        <height>16</height>
       </rect>
      </property>
@@ -220,7 +220,7 @@
     <widget class="QSpinBox" name="note_cc_midi_spin">
      <property name="geometry">
       <rect>
-       <x>90</x>
+       <x>110</x>
        <y>10</y>
        <width>71</width>
        <height>25</height>
@@ -234,11 +234,12 @@
      </property>
     </widget>
    </widget>
+   <widget class="QWidget" name="note_5previousnext"/>
    <widget class="QWidget" name="note_1padb">
     <widget class="QSpinBox" name="note_padb_velocity_spin">
      <property name="geometry">
       <rect>
-       <x>480</x>
+       <x>470</x>
        <y>10</y>
        <width>42</width>
        <height>25</height>
@@ -270,8 +271,8 @@
     <widget class="QLabel" name="note_padb_value_label">
      <property name="geometry">
       <rect>
-       <x>200</x>
-       <y>5</y>
+       <x>210</x>
+       <y>0</y>
        <width>71</width>
        <height>41</height>
       </rect>
@@ -284,7 +285,7 @@
      <property name="geometry">
       <rect>
        <x>290</x>
-       <y>15</y>
+       <y>10</y>
        <width>101</width>
        <height>24</height>
       </rect>
@@ -293,7 +294,7 @@
     <widget class="QLabel" name="note_padb_midich_label">
      <property name="geometry">
       <rect>
-       <x>0</x>
+       <x>20</x>
        <y>0</y>
        <width>81</width>
        <height>41</height>
@@ -306,7 +307,7 @@
     <widget class="QComboBox" name="note_padb_midich_combo">
      <property name="geometry">
       <rect>
-       <x>100</x>
+       <x>120</x>
        <y>10</y>
        <width>72</width>
        <height>24</height>
