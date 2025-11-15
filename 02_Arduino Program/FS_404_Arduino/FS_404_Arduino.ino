@@ -23,11 +23,61 @@ const byte MSG_LEN    = 1 + DATA_BYTES + 1 + 1; // header + data + checksum + en
 const byte HEADER_BYTE = 0xFE;
 const byte END_BYTE    = 0xFF;
 
-enum : byte { PLAY_NOTE = 0, 
-              NEXT_NOTE, 
-              PREVIOUS_NOTE, 
-              RESET_NOTE,
-              KILL_ALL};
+
+
+
+// Mode A pads (16 pads)
+const byte MODE_A_PADS[16] = {
+  0x30, 0x31, 0x32, 0x33,
+  0x2c, 0x2d, 0x2e, 0x2f,
+  0x28, 0x29, 0x2a, 0x2b,
+  0x24, 0x25, 0x26, 0x27
+};
+
+
+// Mode B pads (5 banks × 16 pads = 80)
+const byte MODE_B_PADS[80] = {
+  // Banks A and F
+  0x18, 0x19, 0x2a, 0x2b,
+  0x14, 0x15, 0x16, 0x17,
+  0x10, 0x11, 0x12, 0x13,
+  0x0c, 0x0d, 0x0e, 0x0f,
+  // Banks B and G
+  0x28, 0x29, 0x3a, 0x3b,
+  0x24, 0x25, 0x26, 0x27,
+  0x20, 0x21, 0x22, 0x23,
+  0x1c, 0x1d, 0x1e, 0x1f,
+  // Banks C and H
+  0x38, 0x39, 0x4a, 0x4b,
+  0x34, 0x35, 0x36, 0x37,
+  0x30, 0x31, 0x32, 0x33,
+  0x2c, 0x2d, 0x2e, 0x2f,
+  // Banks D and I
+  0x48, 0x49, 0x5a, 0x5b,
+  0x44, 0x45, 0x46, 0x47,
+  0x40, 0x41, 0x42, 0x43,
+  0x3c, 0x3d, 0x3e, 0x3f,
+  // Banks E and J
+  0x58, 0x59, 0x6a, 0x6b,
+  0x54, 0x55, 0x56, 0x57,
+  0x50, 0x51, 0x52, 0x53,
+  0x4c, 0x4d, 0x4e, 0x4f
+};
+
+enum : byte {
+  PLAY_NOTE = 0, 
+  NEXT_NOTE_A,
+  NEXT_NOTE_LOOP_A,
+  NEXT_NOTE_B,
+  NEXT_NOTE_LOOP_B, 
+  PREVIOUS_NOTE_A, 
+  PREVIOUS_NOTE_LOOP_A,
+  PREVIOUS_NOTE_B,
+  PREVIOUS_NOTE_LOOP_B,
+  SAME_NOTE,
+  RESET_NOTE,
+  KILL_ALL
+};
 
 
 
@@ -154,27 +204,184 @@ void killAllNotes() {
   }
 }
 
+int findIndexModeA(byte pitch) {
+  for (int i = 0; i < 16; i++) {
+    if (MODE_A_PADS[i] == pitch) {
+      return i;
+    }
+  }
+  return -1; // not found
+}
+
+int findIndexModeB(byte pitch) {
+  for (int i = 0; i < 80; i++) {
+    if (MODE_B_PADS[i] == pitch) {
+      return i;
+    }
+  }
+  return -1; // not found
+}
+
+// MIDI channel helpers
+byte getChannel(const Note &note) {
+  return (note.cmd & 0x0F) + 1; // 1..16
+}
+
+void setChannel(Note &note, byte ch) {
+  if (ch < 1)  ch = 1;
+  if (ch > 16) ch = 16;
+  note.cmd = (note.cmd & 0xF0) | ((ch - 1) & 0x0F);
+}
+
+// group = 0..4 (A..E), layer = 0 (A-E) or 1 (F-J)
+byte modeBChannelFor(int group, int layer) {
+  if (group < 0) group = 0;
+  if (group > 4) group = 4;
+  if (layer < 0) layer = 0;
+  if (layer > 1) layer = 1;
+  // channels: (1,2), (3,4), (5,6), (7,8), (9,10)
+  return (byte)(group * 2 + layer + 1);
+}
+
+int modeBLayerFromChannel(byte ch) {
+  // Limit to 1..10 for Mode B
+  if (ch < 1)  ch = 1;
+  if (ch > 10) ch = 10;
+  return (ch - 1) % 2; // odd -> 0, even -> 1
+}
+
+void advanceModeA(Note &note, int dir, bool loop) {
+  int idx = findIndexModeA(note.pitch);
+  if (idx < 0) return; // pitch not in Mode A table
+
+  const int padCount = 16;
+  byte ch = getChannel(note);
+  if (ch < 1)  ch = 1;
+  if (ch > 10) ch = 10; // Mode A uses channels 1..10 as banks
+
+  if (dir > 0) { // NEXT
+    if (idx < padCount - 1) {
+      idx++;
+    } else { // idx == 15, last pad
+      idx = 0; // wrap pad index
+      if (!loop) {
+        // Move to next bank (channel) 1..10
+        ch++;
+        if (ch > 10) ch = 1;
+      }
+    }
+  } else if (dir < 0) { // PREVIOUS
+    if (idx > 0) {
+      idx--;
+    } else { // idx == 0, first pad
+      idx = padCount - 1; // wrap pad index
+      if (!loop) {
+        // Move to previous bank (channel)
+        if (ch > 1) ch--;
+        else        ch = 10;
+      }
+    }
+  }
+
+  note.pitch = MODE_A_PADS[idx];
+  setChannel(note, ch);
+}
+
+
+void advanceModeB(Note &note, int dir, bool loop) {
+  int idx = findIndexModeB(note.pitch);
+  if (idx < 0) return; // pitch not in Mode B table
+
+  const int padCount = 80;
+  byte ch = getChannel(note);
+  int layer = modeBLayerFromChannel(ch); // 0 = A-E, 1 = F-J
+
+  if (dir > 0) { // NEXT
+    if (idx < padCount - 1) {
+      idx++;
+    } else { // idx == 79
+      idx = 0; // wrap pad index
+      if (!loop) {
+        // after going through 80 pads, toggle A-E <-> F-J
+        layer ^= 1;
+      }
+    }
+  } else if (dir < 0) { // PREVIOUS
+    if (idx > 0) {
+      idx--;
+    } else { // idx == 0
+      idx = padCount - 1; // wrap
+      if (!loop) {
+        layer ^= 1;
+      }
+    }
+  }
+
+  int group = idx / 16;       // 0..4
+  note.pitch = MODE_B_PADS[idx];
+
+  // Channel encodes both bank group (A..E) and layer (A-E vs F-J)
+  setChannel(note, modeBChannelFor(group, layer));
+}
+
 
 void sendnote(Note note) { 
-  auto clampPitch = [](int v) -> byte {
-    if (v < 0)   return 0;
-    if (v > 127) return 127;
-    return (byte)v;
-  };
-
   if (note.type == PLAY_NOTE) {
     noteOnOff(note);
     lastNote = note;
   }
-  else if (note.type == NEXT_NOTE) {
+  else if (note.type == NEXT_NOTE_A) {
     note = lastNote;
-    note.pitch = clampPitch(note.pitch + 1);
+    advanceModeA(note, +1, false);
     noteOnOff(note);
     lastNote = note;
   }
-  else if (note.type == PREVIOUS_NOTE) {
+  else if (note.type == NEXT_NOTE_LOOP_A) {
     note = lastNote;
-    note.pitch = clampPitch(note.pitch - 1);
+    advanceModeA(note, +1, true);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == PREVIOUS_NOTE_A) {
+    note = lastNote;
+    advanceModeA(note, -1, false);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == PREVIOUS_NOTE_LOOP_A) {
+    note = lastNote;
+    advanceModeA(note, -1, true);
+    noteOnOff(note);
+    lastNote = note;
+  }
+
+  else if (note.type == NEXT_NOTE_B) {
+    note = lastNote;
+    advanceModeB(note, +1, false);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == NEXT_NOTE_LOOP_B) {
+    note = lastNote;
+    advanceModeB(note, +1, true);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == PREVIOUS_NOTE_B) {
+    note = lastNote;
+    advanceModeB(note, -1, false);
+    noteOnOff(note);
+    lastNote = note;
+  }
+  else if (note.type == PREVIOUS_NOTE_LOOP_B) {
+    note = lastNote;
+    advanceModeB(note, -1, true);
+    noteOnOff(note);
+    lastNote = note;
+  }
+
+  else if (note.type == SAME_NOTE) {
+    note = lastNote;
     noteOnOff(note);
     lastNote = note;
   }
@@ -184,9 +391,10 @@ void sendnote(Note note) {
     lastNote = note;
   }
   else if (note.type == KILL_ALL) {
-  killAllNotes();
+    killAllNotes();
+  }
 }
-}
+
 
 
 // Choosing which note will be played
