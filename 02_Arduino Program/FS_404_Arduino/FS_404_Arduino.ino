@@ -74,7 +74,7 @@ enum : byte {
   PREVIOUS_NOTE_LOOP_A,
   PREVIOUS_NOTE_B,
   PREVIOUS_NOTE_LOOP_B,
-  SAME_NOTE,
+  REPEAT_NOTE,
   RESET_NOTE,
   KILL_ALL
 };
@@ -380,7 +380,7 @@ void sendnote(Note note) {
     lastNote = note;
   }
 
-  else if (note.type == SAME_NOTE) {
+  else if (note.type == REPEAT_NOTE) {
     note = lastNote;
     noteOnOff(note);
     lastNote = note;

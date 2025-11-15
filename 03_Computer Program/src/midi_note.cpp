@@ -1,11 +1,19 @@
 #include "midi_note.h"
+#include <vector>
+#include <array>
+#include <QDebug>
 
 Midi_note::Midi_note() {}
 
-//Returns the three notes message when called
-std::array<unsigned char, 3> Midi_note::returnmessage(){
-    std::array<unsigned char, 3> returnmessage = {status_byte, data_byte_1, data_byte_2};
-    return returnmessage;
+std::array<unsigned char, 4> Midi_note::returnmessage(){
+    // If status_byte < 0x80, we treat it as a "type" (enum) for Previous/Next/Reset/Repeat.
+    if (status_byte < 0x80) {
+        // Previous / Next / Repeat / Reset → only type is meaningful
+        return { status_byte, 0, 0, 0 };
+    }
+
+    // Normal MIDI-style note (SP A, SP B, Midi Notes, CC, SP Commands)
+    return { 0, status_byte, data_byte_1, data_byte_2 };
 }
 
 

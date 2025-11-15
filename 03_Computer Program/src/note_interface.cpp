@@ -139,7 +139,67 @@ void Note_interface::setup_noteui()
         note_ui->note_command_select_label_2->addItem(QString::fromStdString(list_commands[x]));
     }
 
+    //Populating the Previous Next Mode
+    // Command
+    const std::vector<std::string> list_previous_next = { "Previous", "Next", "Repeat", "Reset"};
+    for (int x = 0; x < list_previous_next.size(); x++){
+        note_ui->previousnext_command_box->addItem(QString::fromStdString(list_previous_next[x]));
+    }
+    // MIDI Mode
+    const std::vector<std::string> list_previous_next_midi = { "Mode A", "Mode B"};
+    for (int x = 0; x < list_previous_next_midi.size(); x++){
+        note_ui->previousnext_midi_box->addItem(QString::fromStdString(list_previous_next_midi[x]));
+    }
+
 }
+
+unsigned char Note_interface::currentType() const
+{
+    // Default: plain play
+    unsigned char type = PLAY_NOTE;
+
+    QString mode = note_ui->note_list_mode_combo->currentText();
+
+    if (mode != "Previous Next") {
+        return type; // PLAY_NOTE = 0
+    }
+
+    int cmdIndex  = note_ui->previousnext_command_box->currentIndex();
+    int midiIndex = note_ui->previousnext_midi_box->currentIndex();
+    bool loop = note_ui->previousnext_loop_check->isChecked();
+
+    // Repeat
+    if (cmdIndex == 2) {
+        return REPEAT_NOTE;
+    }
+
+    // Reset (no need to care about mode A/B or loop)
+    if (cmdIndex == 3) {
+        return RESET_NOTE;
+    }
+
+    // NEXT / PREVIOUS with Mode A / B and loop flag
+    bool isPrevious = (cmdIndex == 0); // "Previous"
+    bool isNext     = (cmdIndex == 1); // "Next"
+    bool isA        = (midiIndex == 0); // "Mode A"
+    bool isB        = (midiIndex == 1); // "Mode B"
+
+    if (isNext && isA && !loop)      type = NEXT_NOTE_A;
+    else if (isNext && isA && loop)  type = NEXT_NOTE_LOOP_A;
+    else if (isNext && isB && !loop) type = NEXT_NOTE_B;
+    else if (isNext && isB && loop)  type = NEXT_NOTE_LOOP_B;
+
+    else if (isPrevious && isA && !loop)      type = PREVIOUS_NOTE_A;
+    else if (isPrevious && isA && loop)       type = PREVIOUS_NOTE_LOOP_A;
+    else if (isPrevious && isB && !loop)      type = PREVIOUS_NOTE_B;
+    else if (isPrevious && isB && loop)       type = PREVIOUS_NOTE_LOOP_B;
+
+    return type;
+}
+
+
+
+
 
 //Main interface between the UI and the notes being send
 Midi_note  Note_interface::sendNoteInfo()
@@ -182,6 +242,12 @@ Midi_note  Note_interface::sendNoteInfo()
                               note_ui->note_cc_midi_spin->value(),
                               note_ui->note_cc_number_spin->value(),
                               note_ui->note_cc_value_spin->value());
+    }
+
+    if (activeUiCode == "Previous Next") {
+        unsigned char t = currentType();
+        Midi_note note(t);
+        return note;
     }
 
     return midi_note;

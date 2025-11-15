@@ -145,34 +145,38 @@ void Widget::fs404notesmessage() {
     const unsigned char messageEnd        = 0xFF;
 
     // Gather 3-byte MIDI payloads from the existing UI (unchanged)
-    std::array<unsigned char, 3> n1 = ui->note1->sendNoteInfo().returnmessage();
-    std::array<unsigned char, 3> n2 = ui->note2->sendNoteInfo().returnmessage();
-    std::array<unsigned char, 3> n3 = ui->note3->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 4> n0 = ui->notebase->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 4> n1 = ui->note1->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 4> n2 = ui->note2->sendNoteInfo().returnmessage();
+    std::array<unsigned char, 4> n3 = ui->note3->sendNoteInfo().returnmessage();
 
     // Build the 19-byte message
     unsigned char msg[19];
     msg[0] = messageStart;
 
     // Note 0 (reserved/empty for now): type=0, cmd=0, pitch=0, vel=0
-    msg[1] = 0x00; msg[2] = 0x00; msg[3] = 0x00; msg[4] = 0x00;
+    msg[1] = n0[0];
+    msg[2] = n0[1];
+    msg[3] = n0[2];
+    msg[4] = n0[3];
 
     // Note 1 = type(0) + UI note1
-    msg[5]  = 0x00;       // type
-    msg[6]  = n1[0];      // cmd/status
-    msg[7]  = n1[1];      // pitch/data1
-    msg[8]  = n1[2];      // velocity/data2
+    msg[5]  = n1[0];
+    msg[6]  = n1[1];
+    msg[7]  = n1[2];
+    msg[8]  = n1[3];
 
     // Note 2 = type(0) + UI note2
-    msg[9]  = 0x00;
-    msg[10] = n2[0];
-    msg[11] = n2[1];
-    msg[12] = n2[2];
+    msg[9]  = n2[0];
+    msg[10] = n2[1];
+    msg[11] = n2[2];
+    msg[12] = n2[3];
 
     // Note 3 = type(0) + UI note3
-    msg[13] = 0x00;
-    msg[14] = n3[0];
-    msg[15] = n3[1];
-    msg[16] = n3[2];
+    msg[13] = n3[0];
+    msg[14] = n3[1];
+    msg[15] = n3[2];
+    msg[16] = n3[3];
 
     // Checksum over [0..16]
     unsigned char checksum = 0;

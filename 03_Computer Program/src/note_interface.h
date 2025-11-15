@@ -3,6 +3,8 @@
 #include "midi_note.h"
 #include <QWidget>
 
+
+
 namespace Ui {
 class Note_interface;
 }
@@ -27,6 +29,23 @@ public:
     void update_note_value(int combo_index);
 
     void setIsBaseNote(bool isBase);
+
+    enum NoteType : unsigned char {
+        PLAY_NOTE = 0,
+        NEXT_NOTE_A,
+        NEXT_NOTE_LOOP_A,
+        NEXT_NOTE_B,
+        NEXT_NOTE_LOOP_B,
+        PREVIOUS_NOTE_A,
+        PREVIOUS_NOTE_LOOP_A,
+        PREVIOUS_NOTE_B,
+        PREVIOUS_NOTE_LOOP_B,
+        REPEAT_NOTE,
+        RESET_NOTE,
+        KILL_ALL
+    };
+
+    unsigned char currentType() const;
 
 private slots:
     void on_note_list_mode_combo_currentTextChanged(const QString &arg1);
