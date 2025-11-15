@@ -51,8 +51,8 @@ void Note_interface::on_note_list_mode_combo_currentTextChanged(const QString &a
         return;
     }
 
-    //case Previous Next
-    else if (currentmode == "Previous Next"){
+    //case Toggle
+    else if (currentmode == "Toggle"){
         note_ui->note_stackedWidget->setCurrentWidget(note_ui->note_5previousnext);
         return;
     }
@@ -64,8 +64,8 @@ void Note_interface::on_note_list_mode_combo_currentTextChanged(const QString &a
 void Note_interface::setIsBaseNote(bool isBase)
 {
     if (isBase) {
-        // Remove "Previous Next" from the combo
-        int index = note_ui->note_list_mode_combo->findText("Previous Next");
+        // Remove "Toggle" from the combo
+        int index = note_ui->note_list_mode_combo->findText("Toggle");
         if (index != -1) {
             note_ui->note_list_mode_combo->removeItem(index);
         }
@@ -75,7 +75,7 @@ void Note_interface::setIsBaseNote(bool isBase)
 void Note_interface::setup_noteui()
 {
 
-    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC", "Previous Next"};
+    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC", "Toggle"};
 
     //Populating the upload modes
     for (int x = 0; x < list_modes.size(); x++){
@@ -139,7 +139,7 @@ void Note_interface::setup_noteui()
         note_ui->note_command_select_label_2->addItem(QString::fromStdString(list_commands[x]));
     }
 
-    //Populating the Previous Next Mode
+    //Populating the Toggle Mode
     // Command
     const std::vector<std::string> list_previous_next = { "Previous", "Next", "Repeat", "Reset"};
     for (int x = 0; x < list_previous_next.size(); x++){
@@ -160,7 +160,7 @@ unsigned char Note_interface::currentType() const
 
     QString mode = note_ui->note_list_mode_combo->currentText();
 
-    if (mode != "Previous Next") {
+    if (mode != "Toggle") {
         return type; // PLAY_NOTE = 0
     }
 
@@ -244,7 +244,7 @@ Midi_note  Note_interface::sendNoteInfo()
                               note_ui->note_cc_value_spin->value());
     }
 
-    if (activeUiCode == "Previous Next") {
+    if (activeUiCode == "Toggle") {
         unsigned char t = currentType();
         Midi_note note(t);
         return note;
