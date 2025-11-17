@@ -240,7 +240,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Stop playing all notes if the button is pressed for 2 seconds (Kill switch)</string>
+    <string>Stop playing all notes if the button is pressed for 2 seconds (Kill switch, doesn't work with pads)</string>
    </property>
   </widget>
  </widget>
