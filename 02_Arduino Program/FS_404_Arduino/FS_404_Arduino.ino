@@ -18,8 +18,8 @@ const int LED2  = 8;
 const int LED3  = 7;
 const int LEDON = 6;
 
-const byte DATA_BYTES = 16;              // bytes 1..16
-const byte MSG_LEN    = 1 + DATA_BYTES + 1 + 1; // header + data + checksum + end = 19
+const byte DATA_BYTES = 17; // bytes 1..16 + Kill Switch On Off
+const byte MSG_LEN    = 1 + DATA_BYTES + 1 + 1; // header + data + checksum + end = 20
 const byte HEADER_BYTE = 0xFE;
 const byte END_BYTE    = 0xFF;
 
@@ -94,6 +94,13 @@ Note notes[4];
 
 Note lastNote;
 
+const unsigned long KILL_HOLD_MS = 2000; 
+byte KILL_SWITCH_ACTIVATED;
+
+bool buttonHeld           = false;
+bool killTriggeredHold    = false;
+unsigned long holdStartMs = 0;
+
 
 void setup() {
 
@@ -120,6 +127,8 @@ void setup() {
     notes[i].pitch    = EEPROM.read(3 + i * 4);
     notes[i].velocity = EEPROM.read(4 + i * 4);
   }
+
+  KILL_SWITCH_ACTIVATED= EEPROM.read(DATA_BYTES);
 
   lastNote = notes[0];
 
@@ -423,11 +432,12 @@ bool debounce(bool previousButtonSwitch) {
 // Updates the notes to the Unit
 void notesupdate() {
   /* Message format (4 notes × 4 fields):
-     [0] Header       : 0xFE
-     [1..16] Data     : t1 c1 p1 v1 t2 c2 p2 v2 t3 c3 p3 v3 t4 c4 p4 v4
-     [17] Checksum    : sum of bytes [0..16] modulo 256
-     [18] End         : 0xFF
-     Total size = 19 bytes
+   [0]  Header       : 0xFE
+   [1..16] Data      : t1 c1 p1 v1 t2 c2 p2 v2 t3 c3 p3 v3 t4 c4 p4 v4
+   [17] Config       : kill-switch activation flag, etc.
+   [18] Checksum     : sum of bytes [0..17] (header + all data) modulo 256
+   [19] End          : 0xFF
+   Total size = 20 bytes
   */
 
   byte buffer[MSG_LEN];
@@ -469,7 +479,7 @@ bool messagecheck(const byte *buffer) {
     return 0;
   }
 
-  // Compute checksum over bytes [0..16] (header + 16 data bytes)
+  // Compute checksum over bytes [0..17] (header + 17 data bytes)
   uint8_t checksum = 0;
   for (int x = 0; x <= DATA_BYTES; x++) { // 0..16 inclusive
     checksum += buffer[x];
@@ -488,20 +498,44 @@ bool messagecheck(const byte *buffer) {
 
 void loop() {
   // Checks whether Serial is connected. If this is the case, the pedal will be in update mode
-if (Serial.available() && Serial.peek() == 0xFE) {    notesupdate();
+  if (Serial.available() && Serial.peek() == 0xFE) {
+    notesupdate();
   }
 
   // Checking the toggle and on off switches
   int  toggleSwitchPosition  = switchposition();
-  bool currentSwitchPosition = digitalRead(onOffSwitchPin);
+  bool currentSwitchPosition = digitalRead(onOffSwitchPin); // LOW = pressed
+
+  // --- Long-press detection for kill switch ---
+  bool isPressed = (currentSwitchPosition == LOW);
+
+  if (isPressed) {
+    // Button is currently down
+    if (!buttonHeld) {
+      // Just pressed
+      buttonHeld    = true;
+      killTriggeredHold = false;
+      holdStartMs   = millis();
+    } else {
+      // Held down; check if we've reached the kill time
+      if (!killTriggeredHold && (millis() - holdStartMs >= KILL_HOLD_MS) && KILL_SWITCH_ACTIVATED == 1) {
+        killAllNotes();          // Kill all notes on long press
+        killTriggeredHold = true; // Ensure we do this only once per hold
+      }
+    }
+  } else {
+    // Button is currently up
+    buttonHeld = false;
+  }
 
   // updating the light value and sending midi if the note is on
   if (toggleSwitchPosition >= 0) {
     updatelight(toggleSwitchPosition);
   }
 
-  if (currentSwitchPosition == 0 && debounce(previousButtonSwitch)) {
-    if (toggleSwitchPosition >= 0) {
+  // Short press: only if we did NOT already trigger the kill during this hold
+  if (currentSwitchPosition == LOW && debounce(previousButtonSwitch)) {
+    if (!killTriggeredHold && toggleSwitchPosition >= 0) {
       sendmidi(toggleSwitchPosition);
     }
   }
