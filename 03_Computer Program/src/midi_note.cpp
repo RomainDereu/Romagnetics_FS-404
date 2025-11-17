@@ -6,9 +6,7 @@
 Midi_note::Midi_note() {}
 
 std::array<unsigned char, 4> Midi_note::returnmessage(){
-    // If status_byte < 0x80, we treat it as a "type" (enum) for Previous/Next/Reset/Repeat.
     if (status_byte < 0x80) {
-        // Previous / Next / Repeat / Reset → only type is meaningful
         return { status_byte, 0, 0, 0 };
     }
 

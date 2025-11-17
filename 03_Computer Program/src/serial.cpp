@@ -130,75 +130,60 @@ void Widget::fs404notesmessage() {
 
     ui->logPlainTextEdit->appendPlainText("Starting data transfer");
 
-    // Message format (4 notes × 4 fields):
-    // [0]  Header       : 0xFE
-    // [1..16] Data      : t1 c1 p1 v1  t2 c2 p2 v2  t3 c3 p3 v3  t4 c4 p4 v4
-    // [17] Checksum     : sum of bytes [0..16] (uint8_t wrap)
-    // [18] End          : 0xFF
-    // Total: 19 bytes
+    const unsigned char messageStart = 0xFE;
+    const unsigned char messageEnd   = 0xFF;
 
-    // Status / markers
-    const unsigned char noMessageReceived = 0xFB;
-    const unsigned char messageError      = 0xFC;
-    const unsigned char allreceived       = 0xFD;
-    const unsigned char messageStart      = 0xFE;
-    const unsigned char messageEnd        = 0xFF;
-
-    // Gather 3-byte MIDI payloads from the existing UI (unchanged)
+    // Gather UI note definitions
     std::array<unsigned char, 4> n0 = ui->notebase->sendNoteInfo().returnmessage();
     std::array<unsigned char, 4> n1 = ui->note1->sendNoteInfo().returnmessage();
     std::array<unsigned char, 4> n2 = ui->note2->sendNoteInfo().returnmessage();
     std::array<unsigned char, 4> n3 = ui->note3->sendNoteInfo().returnmessage();
 
-    // Build the 19-byte message
-    unsigned char msg[19];
+    // === 20-byte message buffer ===
+    unsigned char msg[20];
     msg[0] = messageStart;
 
-    // Note 0 (reserved/empty for now): type=0, cmd=0, pitch=0, vel=0
-    msg[1] = n0[0];
-    msg[2] = n0[1];
-    msg[3] = n0[2];
-    msg[4] = n0[3];
+    // 16 data bytes (4×4 fields)
+    msg[1]  = n0[0];
+    msg[2]  = n0[1];
+    msg[3]  = n0[2];
+    msg[4]  = n0[3];
 
-    // Note 1 = type(0) + UI note1
     msg[5]  = n1[0];
     msg[6]  = n1[1];
     msg[7]  = n1[2];
     msg[8]  = n1[3];
 
-    // Note 2 = type(0) + UI note2
     msg[9]  = n2[0];
     msg[10] = n2[1];
     msg[11] = n2[2];
     msg[12] = n2[3];
 
-    // Note 3 = type(0) + UI note3
     msg[13] = n3[0];
     msg[14] = n3[1];
     msg[15] = n3[2];
     msg[16] = n3[3];
 
-    // Checksum over [0..16]
+    // === NEW BYTE: Kill switch activation flag ===
+    msg[17] = ui->killSwitchBox->isChecked() ? 1 : 0;
+
+    // === Checksum over bytes [0..17] ===
     unsigned char checksum = 0;
-    for (int i = 0; i <= 16; ++i) checksum += msg[i];
-    msg[17] = checksum;
+    for (int i = 0; i <= 17; ++i) checksum += msg[i];
+    msg[18] = checksum;
 
     // End byte
-    msg[18] = messageEnd;
+    msg[19] = messageEnd;
 
-    // Ship it
-    char messagechar[19];
-    for (size_t i = 0; i < 19; ++i) messagechar[i] = static_cast<char>(msg[i]);
-    QByteArray messageQByte = QByteArray::fromRawData(messagechar, sizeof(messagechar));
+    // Convert to QByteArray
+    QByteArray messageQByte(reinterpret_cast<const char*>(msg), 20);
     QString messagePlainText = QString(messageQByte.toHex(' '));
 
     bool transferOk = false;
-    int attempts = 0;
     for (int tries = 0; tries < 10 && !transferOk; ++tries) {
         serialWrite(messageQByte);
         transferOk = serialRead();
         delay();
-        ++attempts;
     }
 
     if (transferOk) {

@@ -141,7 +141,7 @@ void Note_interface::setup_noteui()
 
     //Populating the Toggle Mode
     // Command
-    const std::vector<std::string> list_previous_next = { "Previous", "Next", "Repeat", "Reset"};
+    const std::vector<std::string> list_previous_next = { "Previous", "Next", "Repeat", "Reset", "Kill Switch"};
     for (int x = 0; x < list_previous_next.size(); x++){
         note_ui->previousnext_command_box->addItem(QString::fromStdString(list_previous_next[x]));
     }
@@ -168,14 +168,15 @@ unsigned char Note_interface::currentType() const
     int midiIndex = note_ui->previousnext_midi_box->currentIndex();
     bool loop = note_ui->previousnext_loop_check->isChecked();
 
-    // Repeat
     if (cmdIndex == 2) {
         return REPEAT_NOTE;
     }
 
-    // Reset (no need to care about mode A/B or loop)
     if (cmdIndex == 3) {
         return RESET_NOTE;
+    }
+    if (cmdIndex == 4) {
+        return KILL_ALL;
     }
 
     // NEXT / PREVIOUS with Mode A / B and loop flag
