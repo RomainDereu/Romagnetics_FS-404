@@ -65,8 +65,10 @@ To update the pedal:
 2. Download the [Arduino IDE at the following link](https://www.arduino.cc/en/software/)
 3. Deconnect the 9V and MIDI ports and connect the Romagnetics FS-404 to your computer via USB.
    (Do not use a USBC to USBC cable. If needed, use two USB C to USB A cables connected together).
-4. If the board doesn't open in the Arduino IDE, please click on the boards manager and 
+4. If the board doesn't open in the Arduino IDE, please click on the boards manager and add the LGT8fx Boards addon.
+
 ![Schematics](/04_Other/Readme_pictures/Update_board.PNG)
+
 5. Click on upload and confirm that the pedal has been updated correctly in the output tab.
 6. Disconnect the pedal to reboot the firmware.
 
