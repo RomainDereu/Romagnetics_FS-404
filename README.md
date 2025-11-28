@@ -21,7 +21,9 @@ The following parts are required to be able to build the pedal:
 * 1 Switch button (3 positions or ON OFF ON)
 * 1 Guitar pedal enclosure (fits inside a 1590B)
 * 1 Guitar pedal female barrel power connector
-
+Optional:
+* 1 ferrite bead to clean the outcoming signal.
+* diode to prevent from potential back voltage
 
 # 02_Arduino Program
 Contains the Arduino sketch for the pedal.
@@ -31,26 +33,27 @@ The notes played by the FS-404 can be changed using the companion software.
 
 # 03_Computer Program
 Contains the Desktop program to upgrade the notes that are sent by the unit.
+The software has six different modes:
 
-The software has five different modes:
-
-## Midi A
+## SP MIDI A
 In Midi A, all 160 pads can be selected to be played.
 Midi channels are fixed as per Roland.
 
-## Midi B
+## SP MIDI B
 All 160 pads for the Midi B.
 Midi channel can be changed
 
-## Notes
+## SP Commands
+Custom commands for the SP-404 MK2, to control the DJ and Looper modes.
+
+## MIDI Notes
 All the available musical notes can be played on any of the 16 Midi channels.
 
 ## CC
 All CC values can be played as well.
 
-## Commands
-Custom commands for the SP-404 MK2, to control the DJ and Looper modes.
-
+## Toggle
+Based on the value of the base note, toggle between Previous, Next, Repeat, Reset and Kill Switch in either MIDI Mode A or B with or without Looping.
 
 ![Pedal](/04_Other/Readme_pictures/Pedal.jpg)
 
