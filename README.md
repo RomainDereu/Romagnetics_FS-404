@@ -54,7 +54,30 @@ Custom commands for the SP-404 MK2, to control the DJ and Looper modes.
 
 ![Pedal](/04_Other/Readme_pictures/Pedal.jpg)
 
-# 04_About
+# 04_Update
+
+To update the pedal:
+
+1. Download the [ino file containing the Pedal's firmware at this link](/02_Arduino%20Program)
+2. Download the [Arduino IDE at the following link](https://www.arduino.cc/en/software/)
+3. Deconnect the 9V and MIDI ports and connect the Romagnetics FS-404 to your computer via USB.
+   (Do not use a USBC to USBC cable. If needed, use two USB C to USB A cables connected together).
+4. If the board doesn't open in the Arduino IDE, please click on the boards manager and 
+![Schematics](/04_Other/Readme_pictures/Update_board.PNG)
+5. Click on upload and confirm that the pedal has been updated correctly in the output tab.
+6. Disconnect the pedal to reboot the firmware.
+
+To update the Software:
+
+Whether on Mac on or Windows, simply download the new version at the following link:
+
+[Windows Executable](/03_Computer%20Program/Windows_executable)
+[Mac Executable](/03_Computer%20Program/Mac_executable)
+
+# 06_About
 Don't hesitate to contact me if you have any questions regarding this project.
 If you don't want to build the pedal yourself, you can purchase it at  [the following link](https://www.nippon-snaps.com/product/romagnetics-fs-404/):
 
+# 07_Changelog
+2024/12: Version 1.0
+2025/11: Version 2.0
