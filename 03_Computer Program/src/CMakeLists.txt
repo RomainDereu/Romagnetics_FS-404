@@ -32,10 +32,12 @@ qt_add_executable(FS-404
 
 target_link_libraries(FS-404 PRIVATE Qt6::Widgets Qt6::SerialPort)
 
+# Only has effect on Windows (creates a GUI subsystem exe)
 set_target_properties(FS-404 PROPERTIES WIN32_EXECUTABLE TRUE)
 
-# ---- Output paths ----
-set(DEPLOY_DIR "${CMAKE_SOURCE_DIR}/deploy/FS-404")
+# ---- Output / deploy paths (BUILD TREE, not source) ----
+set(DEPLOY_ROOT "${CMAKE_BINARY_DIR}/deploy")
+set(DEPLOY_DIR  "${DEPLOY_ROOT}/FS-404")
 
 # Put exe directly in build folder (not /Release subdir)
 set_target_properties(FS-404 PROPERTIES
@@ -44,29 +46,44 @@ set_target_properties(FS-404 PROPERTIES
 
 qt_finalize_executable(FS-404)
 
-# ---- Automatic deployment ----
+# ---- Copy built binary into deploy dir on ALL platforms ----
+# This ensures DEPLOY_DIR exists and contains FS-404 before packaging.
+add_custom_command(
+  TARGET FS-404 POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEPLOY_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:FS-404>" "${DEPLOY_DIR}/"
+  COMMENT "Copying FS-404 into ${DEPLOY_DIR}"
+)
+
+# ---- Windows-specific Qt deployment ----
 if (WIN32)
   # Path to windeployqt
   set(WINDEPLOYQT_EXE "C:/Qt/6.8.0/mingw_64/bin/windeployqt.exe")
 
   add_custom_command(
     TARGET FS-404 POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEPLOY_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}"
-    # Copy exe
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:FS-404>" "${DEPLOY_DIR}/"
-    # Run windeployqt to populate DLLs beside the exe
-    COMMAND "${WINDEPLOYQT_EXE}" --release --no-translations --compiler-runtime "${DEPLOY_DIR}/FS-404.exe"
-    COMMENT "Deploying FS-404 automatically to ${DEPLOY_DIR}"
+    COMMAND "${WINDEPLOYQT_EXE}"
+            --release
+            --no-translations
+            --compiler-runtime
+            "${DEPLOY_DIR}/FS-404.exe"
+    COMMENT "Running windeployqt into ${DEPLOY_DIR}"
   )
 endif()
 
-# ---- Optional: Create ZIP package automatically ----
+# ---- Create ZIP package automatically on ALL platforms ----
+set(DEPLOY_ZIP "${DEPLOY_ROOT}/FS-404.zip")
+
 add_custom_target(package_fs404 ALL
   DEPENDS FS-404
-  COMMAND "${CMAKE_COMMAND}" -E tar "cfv" "${CMAKE_SOURCE_DIR}/deploy/FS-404.zip" --format=zip "FS-404"
-  WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/deploy"
-  COMMENT "Packaging FS-404 into deploy/FS-404.zip"
+  # Make sure deploy root exists (safe even if it already does)
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEPLOY_ROOT}"
+  # Tar the FS-404 folder in DEPLOY_ROOT into FS-404.zip
+  COMMAND "${CMAKE_COMMAND}" -E tar "cfv" "${DEPLOY_ZIP"
+          --format=zip "FS-404"
+  WORKING_DIRECTORY "${DEPLOY_ROOT}"
+  COMMENT "Packaging FS-404 into ${DEPLOY_ZIP}"
 )
 
 # Include headers in build
