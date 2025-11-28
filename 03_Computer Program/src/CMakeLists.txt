@@ -26,6 +26,7 @@ set(PROJECT_SOURCES
 )
 
 qt_add_executable(FS-404
+    MACOSX_BUNDLE
     MANUAL_FINALIZATION
     ${PROJECT_SOURCES}
 )
