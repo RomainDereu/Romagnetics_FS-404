@@ -80,7 +80,15 @@ Whether on Mac on or Windows, simply download the new version at the following l
 [Mac Executable](/03_Computer%20Program/Mac_executable)
 
 # 05_Regarding the Mac Executable
+If you get the following error when running the Mac programm for the first time:
+"FS-404" Not Opened
 
+![Mac_error_1](/04_Other/Readme_pictures/Mac_error_1.png)
+
+
+Go to System Settings, Privacy & Security. Find the Open Anyway button to open the app
+
+![Mac_error_2](/04_Other/Readme_pictures/Mac_error_2.png)
 
 
 # 06_About

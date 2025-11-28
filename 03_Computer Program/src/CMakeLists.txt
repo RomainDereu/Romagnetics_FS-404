@@ -58,7 +58,7 @@ add_custom_command(
 
 # ---- Windows-specific Qt deployment ----
 if (WIN32)
-  # Path to windeployqt
+  # Path to windeployqt (your original path preserved)
   set(WINDEPLOYQT_EXE "C:/Qt/6.8.0/mingw_64/bin/windeployqt.exe")
 
   add_custom_command(
@@ -77,11 +77,10 @@ set(DEPLOY_ZIP "${DEPLOY_ROOT}/FS-404.zip")
 
 add_custom_target(package_fs404 ALL
   DEPENDS FS-404
-  # Make sure deploy root exists (safe even if it already does)
+  # Make sure deploy root exists
   COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEPLOY_ROOT}"
   # Tar the FS-404 folder in DEPLOY_ROOT into FS-404.zip
-  COMMAND "${CMAKE_COMMAND}" -E tar "cfv" "${DEPLOY_ZIP"
-          --format=zip "FS-404"
+  COMMAND "${CMAKE_COMMAND}" -E tar "cfv" "${DEPLOY_ZIP}" --format=zip "FS-404"
   WORKING_DIRECTORY "${DEPLOY_ROOT}"
   COMMENT "Packaging FS-404 into ${DEPLOY_ZIP}"
 )
