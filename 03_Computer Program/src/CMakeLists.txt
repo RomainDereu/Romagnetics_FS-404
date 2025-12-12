@@ -8,73 +8,83 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ---- Qt5/Qt6 fallback (Widgets + SerialPort for both) ----
-find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets SerialPort)
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets SerialPort)
+# ---- Qt dependencies ----
+find_package(Qt6 REQUIRED COMPONENTS Widgets SerialPort)
 
-# ---- Sources (no duplicates) ----
+# ---- Project sources ----
 set(PROJECT_SOURCES
-  main.cpp
-  widget.cpp
-  widget.h
-  widget.ui
-  note_interface.h
-  note_interface.cpp
-  note_interface.ui
-  midi_note.h
-  midi_note.cpp
-  serial.cpp
+    main.cpp
+    widget.cpp
+    widget.h
+    note_interface.h
+    note_interface.cpp
+    note_interface.ui
+    widget.ui
+    serial.cpp
+    midi_note.h
+    midi_note.cpp
 )
 
-# ---- Targets (keep your OS options as they were) ----
-if (QT_VERSION_MAJOR GREATER_EQUAL 6)
-  qt_add_executable(FS-404
+qt_add_executable(FS-404
+    MACOSX_BUNDLE
     MANUAL_FINALIZATION
     ${PROJECT_SOURCES}
-  )
-else()
-  if (ANDROID)
-    add_library(FS-404 SHARED
-      ${PROJECT_SOURCES}
-    )
-    # set(ANDROID_PACKAGE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/android")
-  else()
-    add_executable(FS-404
-      ${PROJECT_SOURCES}
-    )
-  endif()
-endif()
-
-# ---- Link Qt libs for whichever major version we found ----
-target_link_libraries(FS-404 PRIVATE
-  Qt${QT_VERSION_MAJOR}::Widgets
-  Qt${QT_VERSION_MAJOR}::SerialPort
 )
 
-# ---- Bundle/app properties (same as yours) ----
-# Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
-# If developing for iOS/macOS, consider setting a fixed bundle id manually.
-if(${QT_VERSION} VERSION_LESS 6.1.0)
-  set(BUNDLE_ID_OPTION MACOSX_BUNDLE_GUI_IDENTIFIER com.example.FS-404)
-endif()
+target_link_libraries(FS-404 PRIVATE Qt6::Widgets Qt6::SerialPort)
 
+# Only has effect on Windows (creates a GUI subsystem exe)
+set_target_properties(FS-404 PROPERTIES WIN32_EXECUTABLE TRUE)
+
+# ---- Output / deploy paths (BUILD TREE, not source) ----
+set(DEPLOY_ROOT "${CMAKE_BINARY_DIR}/deploy")
+set(DEPLOY_DIR  "${DEPLOY_ROOT}/FS-404")
+
+# Put exe directly in build folder (not /Release subdir)
 set_target_properties(FS-404 PROPERTIES
-  ${BUNDLE_ID_OPTION}
-  MACOSX_BUNDLE_BUNDLE_VERSION           ${PROJECT_VERSION}
-  MACOSX_BUNDLE_SHORT_VERSION_STRING     ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-  MACOSX_BUNDLE                          TRUE
-  WIN32_EXECUTABLE                       TRUE
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
-include(GNUInstallDirs)
-install(TARGETS FS-404
-  BUNDLE  DESTINATION .
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+qt_finalize_executable(FS-404)
+
+# ---- Copy built binary into deploy dir on ALL platforms ----
+# This ensures DEPLOY_DIR exists and contains FS-404 before packaging.
+add_custom_command(
+  TARGET FS-404 POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E rm -rf "${DEPLOY_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E make_directory "${DEPLOY_DIR}"
+  COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:FS-404>" "${DEPLOY_DIR}/"
+  COMMENT "Copying FS-404 into ${DEPLOY_DIR}"
 )
 
-if (QT_VERSION_MAJOR EQUAL 6)
-  qt_finalize_executable(FS-404)
+# ---- Windows-specific Qt deployment ----
+if (WIN32)
+  # Path to windeployqt (your original path preserved)
+  set(WINDEPLOYQT_EXE "C:/Qt/6.8.0/mingw_64/bin/windeployqt.exe")
+
+  add_custom_command(
+    TARGET FS-404 POST_BUILD
+    COMMAND "${WINDEPLOYQT_EXE}"
+            --release
+            --no-translations
+            --compiler-runtime
+            "${DEPLOY_DIR}/FS-404.exe"
+    COMMENT "Running windeployqt into ${DEPLOY_DIR}"
+  )
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+# ---- Create ZIP package automatically on ALL platforms ----
+set(DEPLOY_ZIP "${DEPLOY_ROOT}/FS-404.zip")
+
+add_custom_target(package_fs404 ALL
+  DEPENDS FS-404
+  # Make sure deploy root exists
+  COMMAND "${CMAKE_COMMAND}" -E make_directory "${DEPLOY_ROOT}"
+  # Tar the FS-404 folder in DEPLOY_ROOT into FS-404.zip
+  COMMAND "${CMAKE_COMMAND}" -E tar "cfv" "${DEPLOY_ZIP}" --format=zip "FS-404"
+  WORKING_DIRECTORY "${DEPLOY_ROOT}"
+  COMMENT "Packaging FS-404 into ${DEPLOY_ZIP}"
+)
+
+# Include headers in build
+target_include_directories(FS-404 PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

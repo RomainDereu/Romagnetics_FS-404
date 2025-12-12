@@ -3,7 +3,6 @@ name: macOS Qt build + test (unsigned)
 on:
   workflow_dispatch:
 
-
 jobs:
   build:
     runs-on: macos-14

@@ -2,6 +2,7 @@
 #define MIDI_NOTE_H
 #include <QChar>
 #include <QString>
+#include <array>
 
 class Midi_note
 {
@@ -13,6 +14,13 @@ public:
         status_byte = letterToMidiChannela(pad_a_first_char);
         data_byte_1 = indexToPadANote(pada_value_combo);
         data_byte_2 = velocity_spin;
+    }
+
+
+    Midi_note(unsigned char type_byte) {
+        status_byte = type_byte;
+        data_byte_1 = 0;
+        data_byte_2 = 0;
     }
 
 
@@ -45,7 +53,7 @@ public:
     //Constructor for midi commands
 
     //Returns the three processed bytes
-    std::array<unsigned char, 3> returnmessage();
+    std::array<unsigned char, 4> returnmessage();
 
 private:
     //The bytes that will be sent via serial

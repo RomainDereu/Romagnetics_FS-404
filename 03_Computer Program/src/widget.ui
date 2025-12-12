@@ -7,11 +7,11 @@
     <x>0</x>
     <y>0</y>
     <width>800</width>
-    <height>600</height>
+    <height>697</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Widget</string>
+   <string>Romagnetics FS-404</string>
   </property>
   <widget class="Line" name="upper_line">
    <property name="geometry">
@@ -61,7 +61,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>320</y>
+     <y>410</y>
      <width>781</width>
      <height>31</height>
     </rect>
@@ -86,7 +86,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>360</y>
+     <y>450</y>
      <width>781</width>
      <height>231</height>
     </rect>
@@ -149,7 +149,7 @@
    <property name="geometry">
     <rect>
      <x>590</x>
-     <y>280</y>
+     <y>360</y>
      <width>195</width>
      <height>24</height>
     </rect>
@@ -161,8 +161,8 @@
   <widget class="Line" name="upper_line_3">
    <property name="geometry">
     <rect>
-     <x>0</x>
-     <y>310</y>
+     <x>10</x>
+     <y>390</y>
      <width>781</width>
      <height>20</height>
     </rect>
@@ -181,7 +181,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>110</y>
+     <y>160</y>
      <width>781</width>
      <height>41</height>
     </rect>
@@ -191,7 +191,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>150</y>
+     <y>200</y>
      <width>781</width>
      <height>41</height>
     </rect>
@@ -201,10 +201,46 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>190</y>
+     <y>240</y>
      <width>781</width>
      <height>41</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="Note_interface" name="notebase" native="true">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>110</y>
+     <width>781</width>
+     <height>41</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="Line" name="line">
+   <property name="geometry">
+    <rect>
+     <x>10</x>
+     <y>140</y>
+     <width>781</width>
+     <height>20</height>
+    </rect>
+   </property>
+   <property name="orientation">
+    <enum>Qt::Orientation::Horizontal</enum>
+   </property>
+  </widget>
+  <widget class="QCheckBox" name="killSwitchBox">
+   <property name="geometry">
+    <rect>
+     <x>20</x>
+     <y>320</y>
+     <width>1041</width>
+     <height>22</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Stop playing all notes if the button is pressed for 2 seconds (Kill switch, doesn't work with pads)</string>
    </property>
   </widget>
  </widget>
