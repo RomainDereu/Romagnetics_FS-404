@@ -54,7 +54,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>2</number>
    </property>
    <widget class="QWidget" name="note_3notes">
     <widget class="QLabel" name="note_velocity_label">
@@ -276,7 +276,7 @@
       <rect>
        <x>320</x>
        <y>10</y>
-       <width>121</width>
+       <width>101</width>
        <height>24</height>
       </rect>
      </property>
@@ -284,9 +284,9 @@
     <widget class="QCheckBox" name="previousnext_loop_check">
      <property name="geometry">
       <rect>
-       <x>450</x>
+       <x>430</x>
        <y>10</y>
-       <width>101</width>
+       <width>121</width>
        <height>22</height>
       </rect>
      </property>
