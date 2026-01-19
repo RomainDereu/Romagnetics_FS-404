@@ -210,7 +210,11 @@ void killAllNotes() {
     Serial.write(0xB0 | ch); Serial.write(64);  Serial.write(0);  // Sustain Off
     Serial.write(0xB0 | ch); Serial.write(120); Serial.write(0);  // All Sound Off
     Serial.write(0xB0 | ch); Serial.write(123); Serial.write(0);  // All Notes Off
+    //In addition, CC85 should also be sent
+    Serial.write(0xB0 | ch); Serial.write(85); Serial.write(127);  // Pads off for SP
   }
+  
+
 }
 
 int findIndexModeA(byte pitch) {

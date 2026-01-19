@@ -3,7 +3,11 @@
 #include "midi_note.h"
 #include <vector>
 #include <string>
+
 #include <qdebug>
+#include <QComboBox>
+#include <QSignalBlocker>
+#include <QStringList>
 
 Note_interface::Note_interface(QWidget *parent)
     : QWidget(parent)
@@ -72,18 +76,31 @@ void Note_interface::setIsBaseNote(bool isBase)
     }
 }
 
-void Note_interface::setup_noteui()
+static void populateCombo(QComboBox* combo,
+                          const std::vector<std::string>& items,
+                          bool clearFirst = true)
 {
+    if (!combo) return;
 
-    const std::vector<std::string> list_modes = { "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC", "Toggle"};
+    const QSignalBlocker blocker(combo);   // prevent signals while repopulating
+    if (clearFirst) combo->clear();
 
-    //Populating the upload modes
-    for (int x = 0; x < list_modes.size(); x++){
-        note_ui->note_list_mode_combo->addItem(QString::fromStdString(list_modes[x]));
+    QStringList qitems;
+    qitems.reserve(static_cast<int>(items.size()));
+    for (const auto& s : items) {
+        qitems << QString::fromStdString(s);
     }
 
-    //Defining the values for the Comboboxes and their respective hex values
-    //All the values are declared explicitely for better readability
+    combo->addItems(qitems);
+}
+
+void Note_interface::setup_noteui()
+{
+    const std::vector<std::string> list_modes = {
+        "SP Midi A", "SP Midi B", "SP Commands", "Midi Notes", "CC", "Toggle"
+    };
+    populateCombo(note_ui->note_list_mode_combo, list_modes);
+
     const std::vector<std::string> list_notes = {
         "C0", "C#0", "D0", "D#0", "E0", "F0", "F#0", "G0", "G#0", "A0", "A#0", "B0",
         "C1", "C#1", "D1", "D#1", "E1", "F1", "F#1", "G1", "G#1", "A1", "A#1", "B1",
@@ -97,11 +114,7 @@ void Note_interface::setup_noteui()
         "C9", "C#9", "D9", "D#9", "E9", "F9", "F#9", "G9", "G#9", "A9", "A#9", "B9",
         "C10", "C#10", "D10", "D#10", "E10", "F10", "F#10", "G10"
     };
-
-    //Populating Midi Notes Mode 3
-    for (int x = 0; x < list_notes.size(); x++){
-        note_ui->note_note_combo->addItem(QString::fromStdString(list_notes[x]));
-    }
+    populateCombo(note_ui->note_note_combo, list_notes);
 
     const std::vector<std::string> list_pads = {
         "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "A10", "A11", "A12", "A13", "A14", "A15", "A16",
@@ -116,42 +129,29 @@ void Note_interface::setup_noteui()
         "J1", "J2", "J3", "J4", "J5", "J6", "J7", "J8", "J9", "J10", "J11", "J12", "J13", "J14", "J15", "J16",
     };
 
-    //Populating the SP Midi A pads
-    for (int x = 0; x < list_pads.size(); x++){
-        note_ui->note_pada_value_combo->addItem(QString::fromStdString(list_pads[x]));
-    }
+    populateCombo(note_ui->note_pada_value_combo, list_pads);
+    populateCombo(note_ui->note_padb_value_combo, list_pads);
 
-    //Populating the SP Midi B pads
-    for (int x = 0; x < list_pads.size(); x++){
-        note_ui->note_padb_value_combo->addItem(QString::fromStdString(list_pads[x]));
-    }
+    const std::vector<std::string> list_midi_b = {
+        "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10", "10/11"
+    };
+    populateCombo(note_ui->note_padb_midich_combo, list_midi_b);
 
-    //Populating mode B midi channels
-    const std::vector<std::string> list_midi_b = { "1/2", "2/3", "3/4", "4/5", "5/6", "6/7", "7/8", "8/9", "9/10", "10/11"};
-    for (int x = 0; x < list_midi_b.size(); x++){
-        note_ui->note_padb_midich_combo->addItem(QString::fromStdString(list_midi_b[x]));
-    }
+    const std::vector<std::string> list_commands = {
+        "Stop Playback","Looper Undo", "Looper Redo",
+        "DJ Play CH1", "DJ Play CH2", "DJ Pause CH1", "DJ Pause CH2"
+    };
+    populateCombo(note_ui->note_command_select_label_2, list_commands);
 
-    //Populating the Command mode
-    const std::vector<std::string> list_commands = { "Stop Playback","Looper Undo", "Looper Redo",
-                                                    "DJ Play CH1", "DJ Play CH2", "DJ Pause CH1", "DJ Pause CH2" };
-    for (int x = 0; x < list_commands.size(); x++){
-        note_ui->note_command_select_label_2->addItem(QString::fromStdString(list_commands[x]));
-    }
+    const std::vector<std::string> list_previous_next = {
+        "Previous", "Next", "Repeat", "Reset", "Kill Switch"
+    };
+    populateCombo(note_ui->previousnext_command_box, list_previous_next);
 
-    //Populating the Toggle Mode
-    // Command
-    const std::vector<std::string> list_previous_next = { "Previous", "Next", "Repeat", "Reset", "Kill Switch"};
-    for (int x = 0; x < list_previous_next.size(); x++){
-        note_ui->previousnext_command_box->addItem(QString::fromStdString(list_previous_next[x]));
-    }
-    // MIDI Mode
-    const std::vector<std::string> list_previous_next_midi = { "Mode A", "Mode B"};
-    for (int x = 0; x < list_previous_next_midi.size(); x++){
-        note_ui->previousnext_midi_box->addItem(QString::fromStdString(list_previous_next_midi[x]));
-    }
-
+    const std::vector<std::string> list_previous_next_midi = { "Mode A", "Mode B" };
+    populateCombo(note_ui->previousnext_midi_box, list_previous_next_midi);
 }
+
 
 unsigned char Note_interface::currentType() const
 {
@@ -245,7 +245,7 @@ Midi_note  Note_interface::sendNoteInfo()
                               note_ui->note_cc_value_spin->value());
     }
 
-    if (activeUiCode == "Toggle") {
+    else if (activeUiCode == "Toggle") {
         unsigned char t = currentType();
         Midi_note note(t);
         return note;

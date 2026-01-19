@@ -98,7 +98,7 @@
      <x>10</x>
      <y>50</y>
      <width>781</width>
-     <height>26</height>
+     <height>38</height>
     </rect>
    </property>
    <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -240,7 +240,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Stop playing all notes if the button is pressed for 2 seconds (Kill switch, doesn't work with pads)</string>
+    <string>Stop playing all notes if the button is pressed for 2 seconds</string>
    </property>
   </widget>
  </widget>
