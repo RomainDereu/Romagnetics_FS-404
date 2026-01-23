@@ -96,6 +96,7 @@ Don't hesitate to contact me if you have any questions regarding this project.
 If you don't want to build the pedal yourself, you can purchase it at  [the following link](https://www.romagnetics.com/product/romagnetics-fs-404/):
 
 # 07_Changelog
-2024/12: Version 1.0.0
+2024/12: Version 1.0.0: Initial version
 2025/11: Version 2.0.0: Addition of the commands
-2026/01: Version 2.1.0
+2026/01: Version 2.1.0: Adding SP-404 pads to the killall command
+2026/01: Version 2.1.1: Minor bug fix
