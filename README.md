@@ -1,4 +1,4 @@
-# FS-404, Midi Pedal and Software for the Roland SP-404 MK2
+# FS-404, Midi Pedal and Software for the SP-404 MK2 groovebox
 All the software used to make the Romagnetics FS-404 Midi Pedal.
 
 ![Banner](/04_Other/Readme_pictures/Banner.png)
@@ -37,7 +37,7 @@ The software has six different modes:
 
 ## SP MIDI A
 In Midi A, all 160 pads can be selected to be played.
-Midi channels are fixed as per Roland.
+Midi channels are fixed as per the maker of the groovebox.
 
 ## SP MIDI B
 All 160 pads for the Midi B.
