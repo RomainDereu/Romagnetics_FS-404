@@ -1,6 +1,10 @@
 # FS-404, Midi Pedal and Software for the SP-404 MK2 groovebox
 All the software used to make the Romagnetics FS-404 Midi Pedal.
 
+[The pedal can be bought here](https://www.romagnetics.com/product/fs-404/)
+
+[Link to the user manual](https://www.romagnetics.com/wiki/doku.php?id=manuals:fs-404)
+
 ![Banner](/04_Other/Readme_pictures/Banner.png)
 
 # 01_Pedal Schematics
@@ -12,9 +16,9 @@ The message can be changed from the Computer Program.
 ![Schematics](/04_Other/Readme_pictures/Schematics.PNG)
 
 The following parts are required to be able to build the pedal:
-* 2 150 Ohm resistors for the midi connexion
+* 2 150 Ohm resistors for the Midi connection
 * 1 220 Ohm resistor for the LED (Resistance may vary depending on your LED)
-* 1 LED
+* 1 LED (the commercial version has 4)
 * 1 Midi 5-pin female connector
 * 1 ON/OFF Switch
 * 1 Push button (guitar pedal switch)
@@ -22,8 +26,8 @@ The following parts are required to be able to build the pedal:
 * 1 Guitar pedal enclosure (fits inside a 1590B)
 * 1 Guitar pedal female barrel power connector
 Optional:
-* 1 ferrite bead to clean the outcoming signal.
-* diode to prevent from potential back voltage
+* 1 ferrite bead to clean the outgoing signal.
+* a diode to prevent potential back voltage
 
 # 02_Arduino Program
 Contains the Arduino sketch for the pedal.
@@ -53,7 +57,7 @@ All the available musical notes can be played on any of the 16 Midi channels.
 All CC values can be played as well.
 
 ## Toggle
-Based on the value of the base note, toggle between Previous, Next, Repeat, Reset and Kill Switch in either MIDI Mode A or B with or without Looping.
+Based on the value of the base note, toggle between Previous, Next, Repeat, Reset, and Kill Switch in either MIDI Mode A or B with or without Looping.
 
 ![Pedal](/04_Other/Readme_pictures/Pedal.jpg)
 
@@ -74,13 +78,13 @@ To update the pedal:
 
 To update the Software:
 
-Whether on Mac on or Windows, simply download the new version at the following link:
+Whether on Mac or Windows, simply download the new version at the following link:
 
 [Windows Executable](/03_Computer%20Program/Windows_executable)
 [Mac Executable](/03_Computer%20Program/Mac_executable)
 
 # 05_Regarding the Mac Executable
-If you get the following error when running the Mac programm for the first time:
+If you get the following error when running the Mac program for the first time:
 "FS-404" Not Opened
 
 ![Mac_error_1](/04_Other/Readme_pictures/Mac_error_1.png)
