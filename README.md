@@ -91,10 +91,9 @@ Go to System Settings, Privacy & Security. Find the Open Anyway button to open t
 ![Mac_error_2](/04_Other/Readme_pictures/Mac_error_2.png)
 
 
-# 06_About
+# 06_Buy the pedal
 Don't hesitate to contact me if you have any questions regarding this project.
 If you don't want to build the pedal yourself, you can purchase it at  [the following link](https://www.nippon-snaps.com/product/romagnetics-fs-404/):
 
-# 07_Changelog
-2024/12: Version 1.0
-2025/11: Version 2.0
+# 07_Manual
+[The detailed manual can be accessed here](https://www.romagnetics.com/wiki/doku.php?id=manuals:fs-404:start)
